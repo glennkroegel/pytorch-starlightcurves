@@ -2,8 +2,6 @@
 created_by: Glenn Kroegel
 date: 20 July 2019
 
-status: WIP
-
 '''
 
 import pandas as pd

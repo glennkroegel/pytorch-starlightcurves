@@ -13,11 +13,13 @@ import os
 
 class TSDataset(torch.utils.data.Dataset):
     def __init__(self, data):
-        self.data = torch.Tensor(data.astype(np.float32))
+        self.x = torch.FloatTensor([x[0].astype(np.float32) for x in data])
+        self.y = torch.LongTensor([x[1]-1 for x in data])
 
     def __getitem__(self, i):
-        item = self.data[i]
-        return item
+        x = self.x[i]
+        y = self.y[i]
+        return x, y
     
     def __len__(self):
-        return len(self.data)
+        return len(self.x)
