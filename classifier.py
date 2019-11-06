@@ -16,19 +16,36 @@ import torch.utils.data as data_utils
 from torch.nn.utils import clip_grad_norm_
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 from tqdm import tqdm
-
-# from dataset import Feat
 from utils import count_parameters, accuracy, bce_acc
+from config import NUM_EPOCHS
+from callbacks import Hook
+import shutil
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 status_properties = ['loss', 'accuracy', 'accuracy_1', 'accuracy_2', 'accuracy_3']
 
+#############################################################################################################################
+
+insize = (1, 1024)
+def get_hooks(m):
+    md = {k:v[1] for k,v in enumerate(m._modules.items())}
+    hooks = {k: Hook(layer) for k, layer in md.items()}
+    x = torch.randn(insize).requires_grad_(False)
+    m.eval()(x)
+    out_szs = {k:h.output[1].shape for k,h in hooks.items()}
+    # inp_szs = {k:h.input.shape for k,h in hooks.items()}
+    inp_szs = None
+    return hooks, inp_szs, out_szs
+
+#############################################################################################################################
+
 class Dense(nn.Module):
-    def __init__(self, in_size, out_size, bias=True):
+    def __init__(self, in_size, out_size, bias=False):
         super(Dense, self).__init__()
         self.fc = nn.Linear(in_size, out_size, bias=bias)
         self.bn = nn.BatchNorm1d(out_size)
-        self.drop = nn.Dropout(0.2)
-        self.act = nn.Softplus()
+        self.drop = nn.Dropout(0.1)
+        self.act = nn.LeakyReLU()
         self.in_size = in_size
         self.out_size = out_size
 
@@ -38,156 +55,203 @@ class Dense(nn.Module):
         return x
 
 class Conv(nn.Module):
-    def __init__(self, in_c, out_c, ks=3, stride=1, bias=True):
+    def __init__(self, in_c, out_c, ks=3, stride=1, padding=1, bias=False):
         super(Conv, self).__init__()
-        self.conv = nn.Conv1d(in_channels=in_c, out_channels=out_c, kernel_size=ks, stride=stride, bias=True)
+        self.conv = nn.Conv1d(in_channels=in_c, out_channels=out_c, kernel_size=ks, stride=stride, bias=bias, padding=padding)
         self.bn = nn.BatchNorm1d(out_c)
-        self.drop = nn.Dropout(0.5)
+        self.drop = nn.Dropout(0.1)
         self.act = nn.LeakyReLU()
         self.in_size = in_c
         self.out_size = out_c
-        self.pad = nn.ConstantPad1d(padding=(1,1), value=-1)
 
     def forward(self, x):
-        x = self.pad(x)
-        x = self.bn(self.drop(self.act(self.conv(x))))
+        x = self.act(self.bn(self.conv(x)))
         return x
 
-class ConvBlock(nn.Module):
-    def __init__(self, in_c, out_c, ks=3, out_dim=14):
-        super(ConvBlock, self).__init__()
-        self.c1 = Conv(in_c=in_c, out_c=out_c, ks=ks)
-        self.c2 = Conv(in_c=out_c, out_c=out_c, ks=ks)
-        self.out_dim = out_dim
-        self.pool = nn.AdaptiveMaxPool1d(self.out_dim)
+class ResBlock(nn.Module):
+    def __init__(self, n):
+        super(ResBlock, self).__init__()
+        self.c1 = Conv(n, n)
+        self.c2 = Conv(n, n)
 
     def forward(self, x):
-        x = self.c1(x)
-        x = self.c2(x)
-        x = self.pool(x)
+        return x + self.c2(self.c1(x))
+
+class ConvResBlock(nn.Module):
+    def __init__(self, in_c, out_c):
+        super(ConvResBlock, self).__init__()
+        self.conv = Conv(in_c=in_c, out_c=out_c, stride=2)
+        self.res_block = ResBlock(out_c)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.res_block(x)
         return x
 
-class ResidualBlock(nn.Module):
-    def __init__(self, in_c, out_c, ks=3, out_dim=14):
-        super(ResidualBlock, self).__init__()
-        self.c1 = Conv(in_c=in_c, out_c=in_c, ks=ks)
-        self.c2 = Conv(in_c=in_c, out_c=in_c, ks=ks)
-        self.c3 = Conv(in_c=in_c, out_c=out_c, ks=ks)
-        self.out_dim = out_dim
-        self.pool = nn.AdaptiveMaxPool1d(self.out_dim)
-
-    def forward(self, x):
-        f = self.c1(x)
-        f = self.c2(x)
-        x2 = f + x
-        x3 = self.c3(x2)
-        x3 = self.pool(x3)
-        return x3
+#############################################################################################################################
 
 class ConvolutionalEncoder(nn.Module):
     def __init__(self):
         super(ConvolutionalEncoder, self).__init__()
-        self.szs = [1024, 512, 256, 128, 64, 32, 16, 3]
-        self.conv1 = Conv(in_c = 1, out_c=20, ks=50)
-        self.pool1 = nn.AdaptiveMaxPool1d(self.szs[7])
-        # self.conv_block = ResidualBlock(in_c=20, out_c=20, ks=3, out_dim=self.szs[2])
-        # self.conv_block2 = ResidualBlock(in_c=20, out_c=20, ks=3, out_dim=self.szs[3])
-        # self.conv_block3 = ResidualBlock(in_c=20, out_c=20, ks=3, out_dim=self.szs[4])
-        # self.conv_block4 = ResidualBlock(in_c=20, out_c=20, ks=3, out_dim=self.szs[5])
-        # self.conv_block5 = ResidualBlock(in_c=20, out_c=20, ks=3, out_dim=self.szs[6])
-        # self.conv_block6 = ResidualBlock(in_c=20, out_c=20, ks=3, out_dim=self.szs[7])
-        # self.fc = Dense(160, 80)
-        # self.fc2 = Dense(80, 40)
-        self.fc3 = Dense(60, 10)
-        self.l_out = nn.Linear(10, 3)
+        self.c1 = ConvResBlock(1, 10)
+        self.pool = nn.AdaptiveMaxPool1d(10)
+        self.fc = Dense(100, 10)
+        self.out = nn.Linear(10, 3)
 
     def forward(self, x):
         bs = x.size(0)
         x = x.unsqueeze(1)
-        x = self.conv1(x)
-        x = self.pool1(x)
-        # x = self.conv_block(x)
-        # x = self.conv_block2(x)
-        # x = self.conv_block3(x)
-        # x = self.conv_block4(x)
-        # x = self.conv_block5(x)
-        # x = self.conv_block6(x)
-        x = x.squeeze()
-        x = x.view(bs, -1)
-        # x = self.fc(x)
-        # x = self.fc2(x)
-        x = self.fc3(x)
-        x = self.l_out(x)
+        x = self.c1(x)
+        x = self.pool(x)
+        x = self.fc(x)
+        x = self.out(x)
         return x
+
+class RNNEncoder(nn.Module):
+    def __init__(self):
+        ''' input: (batch_size, time_steps, in_size)'''
+        super(RNNEncoder, self).__init__()
+        self.dim_out = 12
+        self.nl = 1
+        self.rnn = nn.GRU(1, self.dim_out, num_layers=self.nl, bidirectional=False, dropout=0.1, batch_first=True, bias=False)
+
+    def forward(self, x):
+        x = x.unsqueeze(2)
+        bs = len(x)
+        lens = [a.size(0) for a in x]
+        indices = np.argsort(lens)[::-1].tolist()
+        rev_ind = [indices.index(i) for i in range(len(indices))]
+        x = [x[i] for i in indices]
+        # x = pad_sequence([a.transpose(0,1) for a in x], batch_first=True)
+        x = pad_sequence(x, batch_first=True)
+        input_lengths = [lens[i] for i in indices]
+        packed = pack_padded_sequence(x, input_lengths, batch_first=True)
+        output, hidden = self.rnn(packed)
+        output, _ = pad_packed_sequence(output, batch_first=True)
+        output = output[rev_ind, :].contiguous()
+        hidden = hidden.transpose(0,1)[rev_ind, :, :].contiguous()
+        return hidden
+
+class FeedForward(nn.Module):
+    def __init__(self, in_shp):
+        super(FeedForward, self).__init__()
+        self.in_shp = in_shp
+        if len(in_shp) == 3:
+            in_feats = in_shp[1]*in_shp[2]
+        else:
+            in_feats = in_shp[1]
+        self.fc = Dense(in_feats, 10)
+        self.out = nn.Linear(10, 3)
+
+    def forward(self, x):
+        bs = x.size(0)
+        x = x.view(bs, -1)
+        x = self.fc(x)
+        x = self.out(x)
+        return x
+
+class Classifier(nn.Module):
+    def __init__(self):
+        super(Classifier, self).__init__()
+        encoder = RNNEncoder()
+        hooks, _, enc_szs = get_hooks(encoder)
+        idxs = list(enc_szs.keys())
+        x_sz = enc_szs[len(enc_szs) - 1]
+        x = torch.randn(1, 1024)
+        x.requires_grad_(False)
+        x = encoder(x).view(1, -1)
+        head = FeedForward(x.size())
+        layers = [encoder, head]
+        [print(count_parameters(x)) for x in layers]
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        bs = x.size(0)
+        x = self.layers(x)
+        x = x.view(bs, 3)
+        return x 
+
+###########################################################################
+
+def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, 'model_best.pth.tar')
+
+#######################################################################################
 
 class BaseLearner():
     '''Training loop'''
-    def __init__(self, epochs=20):
-        self.model = ConvolutionalEncoder()#FeedForwardEncoder()
+    def __init__(self, epochs=NUM_EPOCHS):
+        self.model = Classifier().to(device) #ConvolutionalEncoder()
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-2, weight_decay=1e-6)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=20, eta_min=1e-4)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=5e-2, weight_decay=1e-6)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=10, eta_min=1e-3)
         self.epochs = epochs
 
         self.train_loader = torch.load('train_loader.pt')
         self.cv_loader = torch.load('cv_loader.pt')
 
+        self.train_loss = []
+        self.cv_loss = []
+
         self.best_loss = 1e3
         print('Model Parameters: ', count_parameters(self.model))
 
-    def train(self, train_loader, model, criterion, optimizer, epoch):
-        model.train()
+    def iterate(self, loader, model, criterion, optimizer, training=True):
+        if training:
+            model.train()
+        else:
+            model.eval()
         props = {k:0 for k in status_properties}
-        for _, data in enumerate(train_loader):
+        for i, data in enumerate(loader):
+            if i % 100 == 0:
+                print(i)
             x, targets = data
-            targets = targets.view(-1)
-            logits = model(x)
-            loss = criterion(logits, targets)
+            targets = targets.view(-1).to(device)
+            preds = model(x.to(device))
+            loss = criterion(preds, targets)
             props['loss'] += loss.item()
-            a, a1, a2, a3 = accuracy(logits, targets)
+            a, a1, a2, a3 = accuracy(preds, targets)
             props['accuracy'] += a.item()
             props['accuracy_1'] += a1
             props['accuracy_2'] += a2
             props['accuracy_3'] += a3
-            
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            clip_grad_norm_(self.model.parameters(), 0.25)
-        L = len(train_loader)
+            if training:
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                clip_grad_norm_(model.parameters(), 0.5)
+            L = len(loader)
         props = {k:v/L for k,v in props.items()}
         return props
 
     def step(self):
         '''Actual training loop.'''
         for epoch in tqdm(range(self.epochs)):
-            train_props = self.train(self.train_loader, self.model, self.criterion, self.optimizer, epoch)
+            train_props = self.iterate(self.train_loader, self.model, self.criterion, self.optimizer, training=True)
             self.scheduler.step(epoch)
             lr = self.scheduler.get_lr()[0]
+            self.train_loss.append(train_props['loss'])
             # cross validation
-            props = {k:0 for k in status_properties}
             with torch.no_grad():
-                for _, data in enumerate(self.cv_loader):
-                    self.model.eval()
-                    x, targets = data
-                    targets = targets.view(-1)
-                    logits = self.model(x)
-                    val_loss = self.criterion(logits, targets)
-                    props['loss'] += val_loss.item()
-                    a, a1, a2, a3 = accuracy(logits, targets)
-                    props['accuracy'] += a.item()
-                    props['accuracy_1'] += a1
-                    props['accuracy_2'] += a2
-                    props['accuracy_3'] += a3
-                L = len(self.cv_loader)
-                props = {k:v/L for k,v in props.items()}
+                cv_props = self.iterate(self.cv_loader, self.model, self.criterion, self.optimizer, training=False)
+                self.cv_loss.append(cv_props['loss'])
                 if epoch % 1 == 0:
-                    self.status(epoch, train_props, props)
-                if props['loss'] < self.best_loss:
+                    self.status(epoch, train_props, cv_props)
+                if cv_props['loss'] < self.best_loss:
                     print('dumping model...')
                     path = 'model' + '.pt'
                     torch.save(self.model, path)
-                    self.best_loss = props['loss']
+                    self.best_loss = cv_props['loss']
+                    is_best = True
+                save_checkpoint(
+                    {'epoch': epoch + 1,
+                    'lr': lr, 
+                    'state_dict': self.model.state_dict(), 
+                    'optimizer': self.optimizer.state_dict(), 
+                    'best_loss': self.best_loss}, is_best=is_best)
+                is_best=False
 
     def status(self, epoch, train_props, cv_props):
         s0 = 'epoch {0}/{1}\n'.format(epoch, self.epochs)

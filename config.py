@@ -1,2 +1,4 @@
-TRAIN_DATA = 'train_data.pkl'
-CV_DATA = 'cv_data.pkl'
+TRAIN_DATA = 'StarLightCurves_TRAIN.tsv'
+CV_DATA = 'StarLightCurves_TEST.tsv'
+
+NUM_EPOCHS = 10
