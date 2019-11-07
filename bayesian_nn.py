@@ -26,7 +26,7 @@ from pyro.infer import SVI, Trace_ELBO, TraceEnum_ELBO, config_enumerate
 from pyro.optim import Adam, ClippedAdam
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-status_properties = ['loss', 'accuracy']
+status_properties = ['loss', 'accuracy', 'accuracy_1', 'accuracy_2', 'accuracy_3']
 
 # https://alsibahi.xyz/snippets/2019/06/15/pyro_mnist_bnn_kl.html
 # https://forum.pyro.ai/t/mini-batch-training-of-svi-models/895/8
@@ -54,29 +54,25 @@ class Dense(nn.Module):
     def __init__(self, in_size, out_size, bias=False):
         super(Dense, self).__init__()
         self.fc = nn.Linear(in_size, out_size, bias=bias)
-        self.bn = nn.BatchNorm1d(out_size)
-        self.drop = nn.Dropout(0.1)
         self.act = nn.LeakyReLU()
         self.in_size = in_size
         self.out_size = out_size
 
     def forward(self, x):
         x = x.view(-1, self.in_size)
-        x = self.bn(self.drop(self.act(self.fc(x))))
+        x = self.act(self.fc(x))
         return x
 
 class Conv(nn.Module):
     def __init__(self, in_c, out_c, ks=3, stride=1, padding=1, bias=False):
         super(Conv, self).__init__()
         self.conv = nn.Conv1d(in_channels=in_c, out_channels=out_c, kernel_size=ks, stride=stride, bias=bias, padding=padding)
-        self.bn = nn.BatchNorm1d(out_c)
-        self.drop = nn.Dropout(0.1)
         self.act = nn.LeakyReLU()
         self.in_size = in_c
         self.out_size = out_c
 
     def forward(self, x):
-        x = self.act(self.bn(self.conv(x)))
+        x = self.act(self.conv(x))
         return x
 
 class ResBlock(nn.Module):
@@ -104,9 +100,9 @@ class ConvResBlock(nn.Module):
 class ConvolutionalEncoder(nn.Module):
     def __init__(self):
         super(ConvolutionalEncoder, self).__init__()
-        self.c1 = ConvResBlock(1, 10)
+        self.c1 = ConvResBlock(1, 3)
         self.pool = nn.AdaptiveMaxPool1d(10)
-        self.fc = Dense(100, 10)
+        self.fc = Dense(30, 10)
         self.out = nn.Linear(10, 3)
 
     def forward(self, x):
@@ -141,7 +137,35 @@ class RNNEncoder(nn.Module):
         x = x.permute(1, 0, 2) # sl,bs,xs
         h0 = self.init_hidden(bs)
         outp, hidden = self.rnn(x, h0)
-        return hidden
+        x = hidden.view(bs, -1)
+        return x
+
+class TestEncoder(nn.Module):
+    def __init__(self):
+        super(TestEncoder, self).__init__()
+        self.nl = 1
+        self.input_dim = 1
+        self.hidden_dim = 10
+        self.bidir = False
+        self.direction = 1
+        if self.bidir:
+            self.direction = 2
+        self.rnn = nn.GRU(input_size=self.input_dim, bidirectional=self.bidir, hidden_size=self.hidden_dim, num_layers=self.nl, bias=False)
+        self.out = nn.Linear(10, 3, bias=False)
+
+    def init_hidden(self, batch_size):
+        h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim)
+        return h0
+
+    def forward(self, x):
+        bs = x.size(0)
+        x = x.unsqueeze(2)
+        x = x.permute(1, 0, 2) # sl,bs,xs
+        h0 = self.init_hidden(bs)
+        outp, hidden = self.rnn(x, h0)
+        x = hidden.view(bs, self.hidden_dim)
+        x = self.out(x)
+        return x
 
 # class RNNEncoder(nn.Module):
 #     def __init__(self):
@@ -173,16 +197,16 @@ class FeedForward(nn.Module):
         super(FeedForward, self).__init__()
         self.in_shp = in_shp
         if len(in_shp) == 3:
-            in_feats = in_shp[1]*in_shp[2]
+            self.in_feats = in_shp[1]*in_shp[2]
         else:
-            in_feats = in_shp[1]
-        self.fc = Dense(in_feats, 10)
+            self.in_feats = in_shp[1]
+        # self.fc = Dense(self.in_feats, 10)
         self.out = nn.Linear(10, 3)
 
     def forward(self, x):
         bs = x.size(0)
         x = x.view(bs, -1)
-        x = self.fc(x)
+        # x = self.fc(x)
         x = self.out(x)
         return x
 
@@ -192,7 +216,7 @@ class Net(nn.Module):
         encoder = RNNEncoder()
         x = torch.randn(1, 1024)
         x.requires_grad_(False)
-        x = encoder(x).view(1, -1)
+        x = encoder(x)
         head = FeedForward(x.size())
         layers = [encoder, head]
         self.layers = nn.Sequential(*layers)
@@ -206,8 +230,8 @@ class Net(nn.Module):
 class BasicEncoder(nn.Module):
     def __init__(self):
         super(BasicEncoder, self).__init__()
-        self.fc1 = nn.Linear(28*28, 20, bias=False)
-        self.fc2 = nn.Linear(20, 10, bias=False)
+        self.fc1 = nn.Linear(1024, 20, bias=False)
+        self.fc2 = nn.Linear(20, 3, bias=False)
         self.act = nn.LeakyReLU()
 
     def forward(self, x):
@@ -215,7 +239,7 @@ class BasicEncoder(nn.Module):
         x = x.view(bs, -1)
         x = self.act(self.fc1(x))
         x = self.fc2(x)
-        return x
+        return F.log_softmax(x, dim=1)
 
 ###########################################################################
 
@@ -229,7 +253,7 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
 def normal(*shape):
     loc = torch.zeros(*shape).to(device)
     scale = torch.ones(*shape).to(device)
-    dist = Normal(loc, scale).independent(1)
+    dist = Normal(loc, scale)#.independent(1)
     return dist
 
 def variable_normal(name, *shape):
@@ -246,7 +270,7 @@ def variable_normal(name, *shape):
 class Classifier(nn.Module):
     def __init__(self, use_cuda=False):
         super(Classifier, self).__init__()
-        self.encoder = Net()
+        self.encoder = Net()#BasicEncoder()
         self.log_softmax = nn.LogSoftmax(dim=1)
         self.use_cuda = use_cuda
 
@@ -258,13 +282,12 @@ class Classifier(nn.Module):
         priors = {}
         for param, data in self.encoder.named_parameters():
             # if 'weight' in param or 'bias' in param:
-            priors[param] = normal(data.shape).to_event(1)
+            priors[param] = normal(data.shape)
         lifted_module = pyro.random_module("encoder", self.encoder, priors)
         lifted_reg_model = lifted_module()
-        import pdb; pdb.set_trace()
-        with pyro.plate("data", min(bs, 50)):
-            preds = self.log_softmax(lifted_reg_model(inputs))
-            pyro.sample("obs", Categorical(logits=preds).independent(1), obs=targets)
+        # with pyro.plate("data", min(bs, 50)):
+        preds = lifted_reg_model(inputs)
+        pyro.sample("obs", Categorical(logits=preds), obs=targets)
 
     def guide(self, inputs, targets):
         dists = {}
@@ -274,12 +297,18 @@ class Classifier(nn.Module):
         lifted_module = pyro.random_module("encoder", self.encoder, dists)
         return lifted_module()
 
+    # def predict(self, x, num_samples=10):
+    #     sampled_models = [self.guide(None, None) for _ in range(num_samples)]
+    #     preds = [model(x.to(device)) for model in sampled_models]
+    #     preds = torch.stack(preds, dim=2)
+    #     mean = torch.mean(preds, dim=2)
+    #     return mean
+
     def predict(self, x, num_samples=10):
         sampled_models = [self.guide(None, None) for _ in range(num_samples)]
-        preds = [model(x.to(device)) for model in sampled_models]
-        preds = torch.stack(preds, dim=2)
-        mean = torch.mean(preds, dim=2)
-        return mean
+        yhats = [model(x).data for model in sampled_models]
+        mean = torch.mean(torch.stack(yhats), 0)
+        return np.argmax(mean.detach().numpy(), axis=1)
 
     def sample(self, x, num_samples=100):
         sampled_models = [self.guide(None, None) for _ in range(num_samples)]
@@ -304,7 +333,7 @@ if __name__ == "__main__":
         # mdl.step()
         pyro.clear_param_store()
         clf = Classifier()
-        opt = ClippedAdam({"lr": 0.01, "clip_norm": 10.25})
+        opt = ClippedAdam({"lr": 0.1, "clip_norm": 10.25})
         svi = SVI(model=clf.model, guide=clf.guide, optim=opt, loss=Trace_ELBO())
         
         train_loader = torch.load('train_loader.pt')
@@ -315,29 +344,47 @@ if __name__ == "__main__":
         for epoch in tqdm(range(epochs)):
             train_props = {k:0 for k in status_properties}
             for i, data in enumerate(train_loader):
+                clf.train()
                 x, targets = data
                 targets = targets.view(-1)
                 loss = svi.step(x.to(device), targets.to(device))
                 train_props['loss'] += loss
+                preds = clf.predict(x.to(device))
+                a = (preds == targets.detach().numpy())#.float().mean()#accuracy(preds, targets)
+                # a, a1, a2, a3 = accuracy(preds, targets)
+                train_props['accuracy'] += a.mean()
+                # train_props['accuracy_1'] += a1
+                # train_props['accuracy_2'] += a2
+                # train_props['accuracy_3'] += a3
             L = len(train_loader)
             train_props = {k:v/L for k,v in train_props.items()}
 
             cv_props = {k:0 for k in status_properties}
-            for j, data in enumerate(cv_loader):
+            for j, data in enumerate(train_loader):
                 x, targets = data
                 targets = targets.view(-1)
                 x.to(device)
                 targets.to(device)
+                clf.eval()
                 preds = clf.predict(x)
                 cv_props['loss'] += svi.evaluate_loss(x.to(device), targets.to(device))
-                cv_props['accuracy'] += accuracy(preds.to(device), targets.to(device))
-            L = len(cv_loader)
+                # preds = F.log_softmax(preds, dim=1)
+                # preds = torch.argmax(preds, dim=1)
+                # a, a1, a2, a3 = accuracy(preds, targets)
+                # a = accuracy(preds, targets)
+                a = (preds == targets.detach().numpy())
+                cv_props['accuracy'] += a.mean()
+                # cv_props['accuracy_1'] += a1
+                # cv_props['accuracy_2'] += a2
+                # cv_props['accuracy_3'] += a3
+            L = len(train_loader)
             cv_props = {k:v/L for k,v in cv_props.items()}
             if cv_props['loss'] < best_loss:
                 print('Saving state')
                 state = {'state_dict': clf.state_dict(), 'train_props': train_props, 'cv_props': cv_props}
                 torch.save(state, 'nn_state.pth.tar')
                 torch.save(opt, 'nn_opt.pth.tar')
+                best_loss = cv_props['loss']
             status(epoch, train_props, cv_props)
     except KeyboardInterrupt:
         # pd.to_pickle(mdl.train_loss, 'train_loss.pkl')

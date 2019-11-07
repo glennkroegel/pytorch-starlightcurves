@@ -31,15 +31,15 @@ def accuracy(input, targs):
     "Compute accuracy with `targs` when `input` is bs * n_classes."
     n = targs.shape[0]
     inp = input.argmax(dim=-1).view(-1)
-    # targs = targs.view(n,-1)
-    ix1 = (targs == 0).nonzero().squeeze()
-    ix2 = (targs == 1).nonzero().squeeze()
-    ix3 = (targs == 2).nonzero().squeeze()
-    acc1 = (inp[ix1] == targs[ix1]).float().mean().item()
-    acc2 = (inp[ix2] == targs[ix2]).float().mean().item()
-    acc3 = (inp[ix3] == targs[ix3]).float().mean().item()
+    targs = targs.view(n,-1)
+    # ix1 = (targs == 0).nonzero().squeeze()
+    # ix2 = (targs == 1).nonzero().squeeze()
+    # ix3 = (targs == 2).nonzero().squeeze()
+    # acc1 = (inp[ix1] == targs[ix1]).float().mean().item()
+    # acc2 = (inp[ix2] == targs[ix2]).float().mean().item()
+    # acc3 = (inp[ix3] == targs[ix3]).float().mean().item()
     acc = (inp==targs).float().mean()
-    return acc, acc1, acc2, acc3
+    return acc#, acc1, acc2, acc3
 
 def bce_acc(input, targs):
     bs = targs.shape[0]

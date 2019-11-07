@@ -68,10 +68,11 @@ class BalancedDataLoaderFactory():
         cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
         df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)
         df.rename({0: 'y'}, inplace=True, axis=1)
+        d = dict(df['y'].value_counts())
         class_cnt = n_samples // 3
-        df1 = df.loc[df['y']==1].sample(n=class_cnt)
-        df2 = df.loc[df['y']==2].sample(n=class_cnt)
-        df3 = df.loc[df['y']==3].sample(n=class_cnt)
+        df1 = df.loc[df['y']==1].sample(n=min(class_cnt, d[1]))
+        df2 = df.loc[df['y']==2].sample(n=min(class_cnt, d[2]))
+        df3 = df.loc[df['y']==3].sample(n=min(class_cnt, d[3]))
         df = pd.concat([df1, df2, df3], axis=0, ignore_index=True)
         df['y'] = df['y'] - 1
         df_train, df_cv = train_test_split(df, test_size=test_size, stratify=df['y'], random_state=42)
