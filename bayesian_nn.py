@@ -121,28 +121,52 @@ class ConvolutionalEncoder(nn.Module):
 
 class RNNEncoder(nn.Module):
     def __init__(self):
-        ''' input: (batch_size, time_steps, in_size)'''
         super(RNNEncoder, self).__init__()
-        self.dim_out = 8
         self.nl = 1
-        self.rnn = nn.GRU(1, self.dim_out, num_layers=self.nl, bidirectional=False, dropout=0.1, batch_first=True, bias=False)
+        self.input_dim = 1
+        self.hidden_dim = 10
+        self.bidir = False
+        self.direction = 1
+        if self.bidir:
+            self.direction = 2
+        self.rnn = nn.GRU(input_size=self.input_dim, bidirectional=self.bidir, hidden_size=self.hidden_dim, num_layers=self.nl, bias=False)
+
+    def init_hidden(self, batch_size):
+        h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim)
+        return h0
 
     def forward(self, x):
+        bs = x.size(0)
         x = x.unsqueeze(2)
-        bs = len(x)
-        lens = [a.size(0) for a in x]
-        indices = np.argsort(lens)[::-1].tolist()
-        rev_ind = [indices.index(i) for i in range(len(indices))]
-        x = [x[i] for i in indices]
-        # x = pad_sequence([a.transpose(0,1) for a in x], batch_first=True)
-        x = pad_sequence(x, batch_first=True)
-        input_lengths = [lens[i] for i in indices]
-        packed = pack_padded_sequence(x, input_lengths, batch_first=True)
-        output, hidden = self.rnn(packed)
-        output, _ = pad_packed_sequence(output, batch_first=True)
-        output = output[rev_ind, :].contiguous()
-        hidden = hidden.transpose(0,1)[rev_ind, :, :].contiguous()
+        x = x.permute(1, 0, 2) # sl,bs,xs
+        h0 = self.init_hidden(bs)
+        outp, hidden = self.rnn(x, h0)
         return hidden
+
+# class RNNEncoder(nn.Module):
+#     def __init__(self):
+#         ''' input: (batch_size, time_steps, in_size)'''
+#         super(RNNEncoder, self).__init__()
+#         self.dim_out = 8
+#         self.nl = 1
+#         self.rnn = nn.GRU(1, self.dim_out, num_layers=self.nl, bidirectional=False, dropout=0.1, batch_first=True, bias=False)
+
+#     def forward(self, x):
+#         x = x.unsqueeze(2)
+#         bs = len(x)
+#         lens = [a.size(0) for a in x]
+#         indices = np.argsort(lens)[::-1].tolist()
+#         rev_ind = [indices.index(i) for i in range(len(indices))]
+#         x = [x[i] for i in indices]
+#         # x = pad_sequence([a.transpose(0,1) for a in x], batch_first=True)
+#         x = pad_sequence(x, batch_first=True)
+#         input_lengths = [lens[i] for i in indices]
+#         packed = pack_padded_sequence(x, input_lengths, batch_first=True)
+#         output, hidden = self.rnn(packed)
+#         output, _ = pad_packed_sequence(output, batch_first=True)
+#         output = output[rev_ind, :].contiguous()
+#         hidden = hidden.transpose(0,1)[rev_ind, :, :].contiguous()
+#         return hidden
 
 class FeedForward(nn.Module):
     def __init__(self, in_shp):

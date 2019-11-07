@@ -12,6 +12,7 @@ from config import TRAIN_DATA, CV_DATA
 import torch
 import os
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
+from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
 class TSDataset(torch.utils.data.Dataset):
@@ -45,6 +46,46 @@ class DataLoaderFactory():
         cv_set = TSDataset(cv_data, cv_y)
         train_loader = DataLoader(train_set, batch_size=batch_size)
         cv_loader = DataLoader(cv_set, batch_size=batch_size)
+        torch.save(train_loader, 'train_loader.pt')
+        torch.save(cv_loader, 'cv_loader.pt')
+
+    def collate_fn(self, batch):
+        xs = torch.stack([x[0] for x in batch])
+        ys = torch.stack([x[1] for x in batch])
+        return xs, ys
+
+    def save_loaders(self):
+        torch.save(self.train_loader, 'train_loader.pt')
+        torch.save(self.cv_loader, 'cv_loader.pt')
+
+class BalancedDataLoaderFactory():
+    '''Standard dataloaders with regular collating/sampling from padded dataset'''
+    def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
+        pass
+
+    def gen_loaders(self, n_samples=1500, test_size=0.1, batch_size=50):
+        train_data = pd.read_csv(TRAIN_DATA, delimiter='\t', header=None)
+        cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
+        df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)
+        df.rename({0: 'y'}, inplace=True, axis=1)
+        class_cnt = n_samples // 3
+        df1 = df.loc[df['y']==1].sample(n=class_cnt)
+        df2 = df.loc[df['y']==2].sample(n=class_cnt)
+        df3 = df.loc[df['y']==3].sample(n=class_cnt)
+        df = pd.concat([df1, df2, df3], axis=0, ignore_index=True)
+        df['y'] = df['y'] - 1
+        df_train, df_cv = train_test_split(df, test_size=test_size, stratify=df['y'], random_state=42)
+        print(df_train['y'].value_counts(), df_cv['y'].value_counts())
+        train_y = df_train['y'].values
+        cv_y = df_cv['y'].values
+        df_train.drop('y', axis=1, inplace=True)
+        df_cv.drop('y', axis=1, inplace=True)
+        train_data = df_train.values.astype(np.float32)
+        cv_data = df_cv.values.astype(np.float32)
+        train_set = TSDataset(train_data, train_y)
+        cv_set = TSDataset(cv_data, cv_y)
+        train_loader = DataLoader(train_set, batch_size=batch_size, drop_last=True)
+        cv_loader = DataLoader(cv_set, batch_size=batch_size, drop_last=True)
         torch.save(train_loader, 'train_loader.pt')
         torch.save(cv_loader, 'cv_loader.pt')
 
