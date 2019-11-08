@@ -16,7 +16,7 @@ import torch.utils.data as data_utils
 from torch.nn.utils import clip_grad_norm_
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 from tqdm import tqdm
-from utils import count_parameters, accuracy, bce_acc
+from utils import count_parameters, accuracy, bce_acc, accuracy_from_logits
 from config import NUM_EPOCHS
 from callbacks import Hook
 import shutil
@@ -112,7 +112,7 @@ class RNNEncoder(nn.Module):
         super(RNNEncoder, self).__init__()
         self.nl = 1
         self.input_dim = 1
-        self.hidden_dim = 10
+        self.hidden_dim = 5
         self.bidir = False
         self.direction = 1
         if self.bidir:
@@ -120,7 +120,7 @@ class RNNEncoder(nn.Module):
         self.rnn = nn.GRU(input_size=self.input_dim, bidirectional=self.bidir, hidden_size=self.hidden_dim, num_layers=self.nl, bias=False)
 
     def init_hidden(self, batch_size):
-        h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim)
+        h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim, device=device).cuda()
         return h0
 
     def forward(self, x):
@@ -128,7 +128,7 @@ class RNNEncoder(nn.Module):
         x = x.unsqueeze(2)
         x = x.permute(1, 0, 2) # sl,bs,xs
         h0 = self.init_hidden(bs)
-        outp, hidden = self.rnn(x, h0)
+        _, hidden = self.rnn(x, h0)
         x = hidden.view(bs, -1)
         return x
 
@@ -176,19 +176,22 @@ class FeedForward(nn.Module):
         return x
 
 class Classifier(nn.Module):
-    def __init__(self):
+    def __init__(self, use_cuda=True):
         super(Classifier, self).__init__()
-        encoder = RNNEncoder()
-        hooks, _, enc_szs = get_hooks(encoder)
-        idxs = list(enc_szs.keys())
-        x_sz = enc_szs[len(enc_szs) - 1]
+        encoder = RNNEncoder().to(device)
+        # hooks, _, enc_szs = get_hooks(encoder)
+        # idxs = list(enc_szs.keys())
+        # x_sz = enc_szs[len(enc_szs) - 1]
         x = torch.randn(1, 1024)
         x.requires_grad_(False)
-        x = encoder(x).view(1, -1)
-        head = FeedForward(x.size())
-        layers = [encoder, head]
+        x = encoder(x.to(device))
+        head = FeedForward(x.size()).to(device)
+        layers = [encoder.to(device), head.to(device)]
         [print(count_parameters(x)) for x in layers]
         self.layers = nn.Sequential(*layers)
+
+        if use_cuda:
+            self.cuda()
 
     def forward(self, x):
         bs = x.size(0)
@@ -231,11 +234,12 @@ class BaseLearner():
         props = {k:0 for k in status_properties}
         for i, data in enumerate(loader):
             x, targets = data
+            x = x.to(device)
             targets = targets.view(-1).to(device)
-            preds = model(x.to(device))
+            preds = model(x)
             loss = criterion(preds, targets)
             props['loss'] += loss.item()
-            a, a1, a2, a3 = accuracy(preds, targets)
+            a, a1, a2, a3 = accuracy_from_logits(preds, targets)
             props['accuracy'] += a.item()
             props['accuracy_1'] += a1
             props['accuracy_2'] += a2

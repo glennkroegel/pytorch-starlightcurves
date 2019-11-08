@@ -23,7 +23,7 @@ import pyro
 import pyro.distributions as dist
 from pyro.distributions import Normal, Categorical
 from pyro.infer import SVI, Trace_ELBO, TraceEnum_ELBO, config_enumerate
-from pyro.optim import Adam, ClippedAdam
+from pyro.optim import Adam, ClippedAdam, SGD
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 status_properties = ['loss', 'accuracy', 'accuracy_1', 'accuracy_2', 'accuracy_3']
@@ -120,7 +120,7 @@ class RNNEncoder(nn.Module):
         super(RNNEncoder, self).__init__()
         self.nl = 1
         self.input_dim = 1
-        self.hidden_dim = 10
+        self.hidden_dim = 20
         self.bidir = False
         self.direction = 1
         if self.bidir:
@@ -129,7 +129,7 @@ class RNNEncoder(nn.Module):
 
     def init_hidden(self, batch_size):
         h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim)
-        return h0
+        return h0.to(device)
 
     def forward(self, x):
         bs = x.size(0)
@@ -171,7 +171,7 @@ class TestEncoder(nn.Module):
 #     def __init__(self):
 #         ''' input: (batch_size, time_steps, in_size)'''
 #         super(RNNEncoder, self).__init__()
-#         self.dim_out = 8
+#         self.dim_out = 10
 #         self.nl = 1
 #         self.rnn = nn.GRU(1, self.dim_out, num_layers=self.nl, bidirectional=False, dropout=0.1, batch_first=True, bias=False)
 
@@ -186,10 +186,12 @@ class TestEncoder(nn.Module):
 #         x = pad_sequence(x, batch_first=True)
 #         input_lengths = [lens[i] for i in indices]
 #         packed = pack_padded_sequence(x, input_lengths, batch_first=True)
+#         self.rnn.flatten_parameters()
 #         output, hidden = self.rnn(packed)
 #         output, _ = pad_packed_sequence(output, batch_first=True)
 #         output = output[rev_ind, :].contiguous()
 #         hidden = hidden.transpose(0,1)[rev_ind, :, :].contiguous()
+#         hidden = hidden.view(bs, -1)
 #         return hidden
 
 class FeedForward(nn.Module):
@@ -213,11 +215,11 @@ class FeedForward(nn.Module):
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        encoder = RNNEncoder()
+        encoder = RNNEncoder().to(device)
         x = torch.randn(1, 1024)
         x.requires_grad_(False)
-        x = encoder(x)
-        head = FeedForward(x.size())
+        x = encoder(x.to(device))
+        head = FeedForward(x.size()).to(device)
         layers = [encoder, head]
         self.layers = nn.Sequential(*layers)
 
@@ -268,9 +270,9 @@ def variable_normal(name, *shape):
 #######################################################################################
 
 class Classifier(nn.Module):
-    def __init__(self, use_cuda=False):
+    def __init__(self, use_cuda=True):
         super(Classifier, self).__init__()
-        self.encoder = Net()#BasicEncoder()
+        self.encoder = Net()
         self.log_softmax = nn.LogSoftmax(dim=1)
         self.use_cuda = use_cuda
 
@@ -306,9 +308,9 @@ class Classifier(nn.Module):
 
     def predict(self, x, num_samples=10):
         sampled_models = [self.guide(None, None) for _ in range(num_samples)]
-        yhats = [model(x).data for model in sampled_models]
+        yhats = [model(x.to(device)).data for model in sampled_models]
         mean = torch.mean(torch.stack(yhats), 0)
-        return np.argmax(mean.detach().numpy(), axis=1)
+        return mean.argmax(dim=1)
 
     def sample(self, x, num_samples=100):
         sampled_models = [self.guide(None, None) for _ in range(num_samples)]
@@ -329,11 +331,9 @@ def status(epoch, train_props, cv_props):
 
 if __name__ == "__main__":
     try:
-        # mdl = BaseLearner()
-        # mdl.step()
         pyro.clear_param_store()
         clf = Classifier()
-        opt = ClippedAdam({"lr": 0.1, "clip_norm": 10.25})
+        opt = ClippedAdam({"lr": 1.0, "clip_norm": 0.1})
         svi = SVI(model=clf.model, guide=clf.guide, optim=opt, loss=Trace_ELBO())
         
         train_loader = torch.load('train_loader.pt')
@@ -346,13 +346,15 @@ if __name__ == "__main__":
             for i, data in enumerate(train_loader):
                 clf.train()
                 x, targets = data
+                x = x.to(device)
+                targets = targets.to(device)
                 targets = targets.view(-1)
-                loss = svi.step(x.to(device), targets.to(device))
+                loss = svi.step(x, targets)
                 train_props['loss'] += loss
-                preds = clf.predict(x.to(device))
-                a = (preds == targets.detach().numpy())#.float().mean()#accuracy(preds, targets)
+                preds = clf.predict(x)
+                a = (preds == targets).float().mean()#accuracy(preds, targets)
                 # a, a1, a2, a3 = accuracy(preds, targets)
-                train_props['accuracy'] += a.mean()
+                train_props['accuracy'] += a.item()
                 # train_props['accuracy_1'] += a1
                 # train_props['accuracy_2'] += a2
                 # train_props['accuracy_3'] += a3
@@ -363,17 +365,17 @@ if __name__ == "__main__":
             for j, data in enumerate(train_loader):
                 x, targets = data
                 targets = targets.view(-1)
-                x.to(device)
-                targets.to(device)
+                x = x.to(device)
+                targets = targets.to(device)
                 clf.eval()
                 preds = clf.predict(x)
-                cv_props['loss'] += svi.evaluate_loss(x.to(device), targets.to(device))
+                cv_props['loss'] += svi.evaluate_loss(x, targets)
                 # preds = F.log_softmax(preds, dim=1)
                 # preds = torch.argmax(preds, dim=1)
                 # a, a1, a2, a3 = accuracy(preds, targets)
                 # a = accuracy(preds, targets)
-                a = (preds == targets.detach().numpy())
-                cv_props['accuracy'] += a.mean()
+                a = (preds == targets).float().mean()
+                cv_props['accuracy'] += a.item()
                 # cv_props['accuracy_1'] += a1
                 # cv_props['accuracy_2'] += a2
                 # cv_props['accuracy_3'] += a3
