@@ -112,7 +112,7 @@ class RNNEncoder(nn.Module):
         super(RNNEncoder, self).__init__()
         self.nl = 1
         self.input_dim = 1
-        self.hidden_dim = 5
+        self.hidden_dim = 10
         self.bidir = False
         self.direction = 1
         if self.bidir:
@@ -120,7 +120,7 @@ class RNNEncoder(nn.Module):
         self.rnn = nn.GRU(input_size=self.input_dim, bidirectional=self.bidir, hidden_size=self.hidden_dim, num_layers=self.nl, bias=False)
 
     def init_hidden(self, batch_size):
-        h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim, device=device).cuda()
+        h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim, device=device)
         return h0
 
     def forward(self, x):
@@ -165,18 +165,18 @@ class FeedForward(nn.Module):
             self.in_feats = in_shp[1]*in_shp[2]
         else:
             self.in_feats = in_shp[1]
-        self.fc = Dense(self.in_feats, 10)
+        # self.fc = Dense(self.in_feats, 10)
         self.out = nn.Linear(10, 3)
 
     def forward(self, x):
         bs = x.size(0)
         x = x.view(bs, self.in_feats)
-        x = self.fc(x)
+        # x = self.fc(x)
         x = self.out(x)
         return x
 
 class Classifier(nn.Module):
-    def __init__(self, use_cuda=True):
+    def __init__(self, use_cuda=False):
         super(Classifier, self).__init__()
         encoder = RNNEncoder().to(device)
         # hooks, _, enc_szs = get_hooks(encoder)

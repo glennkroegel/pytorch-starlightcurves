@@ -120,12 +120,12 @@ class RNNEncoder(nn.Module):
         super(RNNEncoder, self).__init__()
         self.nl = 1
         self.input_dim = 1
-        self.hidden_dim = 20
+        self.hidden_dim = 8
         self.bidir = False
         self.direction = 1
         if self.bidir:
             self.direction = 2
-        self.rnn = nn.GRU(input_size=self.input_dim, bidirectional=self.bidir, hidden_size=self.hidden_dim, num_layers=self.nl, bias=False)
+        self.rnn = nn.GRU(input_size=self.input_dim, bidirectional=self.bidir, hidden_size=self.hidden_dim, num_layers=self.nl, bias=True)
 
     def init_hidden(self, batch_size):
         h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim)
@@ -138,33 +138,6 @@ class RNNEncoder(nn.Module):
         h0 = self.init_hidden(bs)
         outp, hidden = self.rnn(x, h0)
         x = hidden.view(bs, -1)
-        return x
-
-class TestEncoder(nn.Module):
-    def __init__(self):
-        super(TestEncoder, self).__init__()
-        self.nl = 1
-        self.input_dim = 1
-        self.hidden_dim = 10
-        self.bidir = False
-        self.direction = 1
-        if self.bidir:
-            self.direction = 2
-        self.rnn = nn.GRU(input_size=self.input_dim, bidirectional=self.bidir, hidden_size=self.hidden_dim, num_layers=self.nl, bias=False)
-        self.out = nn.Linear(10, 3, bias=False)
-
-    def init_hidden(self, batch_size):
-        h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim)
-        return h0
-
-    def forward(self, x):
-        bs = x.size(0)
-        x = x.unsqueeze(2)
-        x = x.permute(1, 0, 2) # sl,bs,xs
-        h0 = self.init_hidden(bs)
-        outp, hidden = self.rnn(x, h0)
-        x = hidden.view(bs, self.hidden_dim)
-        x = self.out(x)
         return x
 
 # class RNNEncoder(nn.Module):
@@ -203,7 +176,7 @@ class FeedForward(nn.Module):
         else:
             self.in_feats = in_shp[1]
         # self.fc = Dense(self.in_feats, 10)
-        self.out = nn.Linear(10, 3)
+        self.out = nn.Linear(self.in_feats, 3)
 
     def forward(self, x):
         bs = x.size(0)
@@ -270,7 +243,7 @@ def variable_normal(name, *shape):
 #######################################################################################
 
 class Classifier(nn.Module):
-    def __init__(self, use_cuda=True):
+    def __init__(self, use_cuda=False):
         super(Classifier, self).__init__()
         self.encoder = Net()
         self.log_softmax = nn.LogSoftmax(dim=1)
@@ -333,7 +306,7 @@ if __name__ == "__main__":
     try:
         pyro.clear_param_store()
         clf = Classifier()
-        opt = ClippedAdam({"lr": 1.0, "clip_norm": 0.1})
+        opt = ClippedAdam({"lr": 0.1, "clip_norm": 0.01})
         svi = SVI(model=clf.model, guide=clf.guide, optim=opt, loss=Trace_ELBO())
         
         train_loader = torch.load('train_loader.pt')
@@ -362,7 +335,7 @@ if __name__ == "__main__":
             train_props = {k:v/L for k,v in train_props.items()}
 
             cv_props = {k:0 for k in status_properties}
-            for j, data in enumerate(train_loader):
+            for j, data in enumerate(cv_loader):
                 x, targets = data
                 targets = targets.view(-1)
                 x = x.to(device)
@@ -379,7 +352,7 @@ if __name__ == "__main__":
                 # cv_props['accuracy_1'] += a1
                 # cv_props['accuracy_2'] += a2
                 # cv_props['accuracy_3'] += a3
-            L = len(train_loader)
+            L = len(cv_loader)
             cv_props = {k:v/L for k,v in cv_props.items()}
             if cv_props['loss'] < best_loss:
                 print('Saving state')
