@@ -21,34 +21,12 @@ from config import NUM_EPOCHS
 
 import pyro
 import pyro.distributions as dist
-from pyro.distributions import Normal, Categorical
+from pyro.distributions import Normal, Categorical, Bernoulli
 from pyro.infer import SVI, Trace_ELBO, TraceEnum_ELBO, config_enumerate
 from pyro.optim import Adam, ClippedAdam, SGD
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-status_properties = ['loss', 'accuracy', 'accuracy_1', 'accuracy_2', 'accuracy_3']
-
-# https://alsibahi.xyz/snippets/2019/06/15/pyro_mnist_bnn_kl.html
-# https://forum.pyro.ai/t/mini-batch-training-of-svi-models/895/8
-# https://github.com/paraschopra/bayesian-neural-network-mnist/blob/master/bnn.ipynb
-# checkpointing: https://pyro.ai/examples/dmm.html
-# deep kernel learning - https://pyro.ai/examples/dkl.html
-# https://forum.pyro.ai/t/trying-to-create-bayensian-convnets-using-pyro/563/3
-
-#############################################################################################################################
-
-insize = (1, 1, 28, 28)
-def get_hooks(m):
-    # md = {k:v for k,v in m._modules.items()}
-    md = {k:v[1] for k,v in enumerate(m._modules.items())}
-    hooks = {k: Hook(layer) for k, layer in md.items()}
-    x = torch.randn(insize).requires_grad_(False)
-    m.eval()(x)
-    out_szs = {k:h.output.shape for k,h in hooks.items()}
-    inp_szs = {k:h.input[0].shape for k,h in hooks.items()}
-    return hooks, inp_szs, out_szs
-
-#############################################################################################################################
+status_properties = ['loss']
 
 class Dense(nn.Module):
     def __init__(self, in_size, out_size, bias=False):
@@ -115,20 +93,30 @@ class ConvolutionalEncoder(nn.Module):
         x = self.out(x)
         return x
 
-class RNNEncoder(nn.Module):
+class Parameters:
     def __init__(self):
-        super(RNNEncoder, self).__init__()
-        self.nl = 1
         self.input_dim = 1
-        self.hidden_dim = 8
+        self.hidden_dim = 20
+        self.nl = 1
         self.bidir = False
         self.direction = 1
         if self.bidir:
             self.direction = 2
-        self.rnn = nn.GRU(input_size=self.input_dim, bidirectional=self.bidir, hidden_size=self.hidden_dim, num_layers=self.nl, bias=True)
+        self.sl = 1024
+        self.z_dim = 20
+
+class RNNEncoder(nn.Module):
+    def __init__(self, params):
+        super(RNNEncoder, self).__init__()
+        self.params = params
+        self.rnn = nn.GRU(input_size=params.input_dim, 
+                          bidirectional=params.bidir, 
+                          hidden_size=params.hidden_dim, 
+                          num_layers=params.nl, 
+                          bias=False)
 
     def init_hidden(self, batch_size):
-        h0 = torch.zeros(self.nl*self.direction, batch_size, self.hidden_dim)
+        h0 = torch.zeros(self.params.nl*self.params.direction, batch_size, self.params.hidden_dim)
         return h0.to(device)
 
     def forward(self, x):
@@ -140,88 +128,66 @@ class RNNEncoder(nn.Module):
         x = hidden.view(bs, -1)
         return x
 
-# class RNNEncoder(nn.Module):
-#     def __init__(self):
-#         ''' input: (batch_size, time_steps, in_size)'''
-#         super(RNNEncoder, self).__init__()
-#         self.dim_out = 10
-#         self.nl = 1
-#         self.rnn = nn.GRU(1, self.dim_out, num_layers=self.nl, bidirectional=False, dropout=0.1, batch_first=True, bias=False)
+class Encoder(nn.Module):
+    def __init__(self, params):
+        super(Encoder, self).__init__()
+        self.rnn_enc = RNNEncoder(params)
 
-#     def forward(self, x):
-#         x = x.unsqueeze(2)
-#         bs = len(x)
-#         lens = [a.size(0) for a in x]
-#         indices = np.argsort(lens)[::-1].tolist()
-#         rev_ind = [indices.index(i) for i in range(len(indices))]
-#         x = [x[i] for i in indices]
-#         # x = pad_sequence([a.transpose(0,1) for a in x], batch_first=True)
-#         x = pad_sequence(x, batch_first=True)
-#         input_lengths = [lens[i] for i in indices]
-#         packed = pack_padded_sequence(x, input_lengths, batch_first=True)
-#         self.rnn.flatten_parameters()
-#         output, hidden = self.rnn(packed)
-#         output, _ = pad_packed_sequence(output, batch_first=True)
-#         output = output[rev_ind, :].contiguous()
-#         hidden = hidden.transpose(0,1)[rev_ind, :, :].contiguous()
-#         hidden = hidden.view(bs, -1)
-#         return hidden
-
-class FeedForward(nn.Module):
-    def __init__(self, in_shp):
-        super(FeedForward, self).__init__()
-        self.in_shp = in_shp
-        if len(in_shp) == 3:
-            self.in_feats = in_shp[1]*in_shp[2]
-        else:
-            self.in_feats = in_shp[1]
-        # self.fc = Dense(self.in_feats, 10)
-        self.out = nn.Linear(self.in_feats, 3)
-
-    def forward(self, x):
-        bs = x.size(0)
-        x = x.view(bs, -1)
-        # x = self.fc(x)
-        x = self.out(x)
-        return x
-
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        encoder = RNNEncoder().to(device)
+        self.rnn_enc.eval()
         x = torch.randn(1, 1024)
         x.requires_grad_(False)
-        x = encoder(x.to(device))
-        head = FeedForward(x.size()).to(device)
-        layers = [encoder, head]
-        self.layers = nn.Sequential(*layers)
+        x = self.rnn_enc(x)
+        in_sz = x.size(1) 
+        self.rnn_enc.train()
+
+        self.fc_scale = nn.Linear(in_sz, params.z_dim)
+        self.fc_loc = nn.Linear(in_sz, params.z_dim)
+        self.softplus = nn.Softplus()
 
     def forward(self, x):
-        bs = x.size(0)
-        x = self.layers(x)
-        x = x.view(bs, 3)
-        return x 
+        x = self.rnn_enc(x)
+        z_loc = self.fc_loc(x)
+        z_scale = torch.exp(self.fc_scale(x))
+        return z_loc, z_scale
 
-class BasicEncoder(nn.Module):
+class Decoder(nn.Module):
+    def __init__(self, params):
+        self.fc = nn.Linear(params.z_dim, params.hidden_dim)
+        self.rnn = nn.GRU(input_size=params.hidden_dim, 
+                          bidirectional=params.bidir, 
+                          hidden_size=params.input_size, 
+                          num_layers=params.nl, 
+                          bias=False)
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, z):
+        pass
+
+class VAE(nn.Module):
     def __init__(self):
-        super(BasicEncoder, self).__init__()
-        self.fc1 = nn.Linear(1024, 20, bias=False)
-        self.fc2 = nn.Linear(20, 3, bias=False)
-        self.act = nn.LeakyReLU()
+        super(VAE, self).__init__()
+        self.params = Parameters()
+        self.encoder = Encoder(self.params)
+        self.decoder = Decoder(self.params)
 
-    def forward(self, x):
-        bs = x.size(0)
-        x = x.view(bs, -1)
-        x = self.act(self.fc1(x))
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
+        if torch.cuda.is_available():
+            self.cuda()
 
-###########################################################################
+    def model(self, x):
+        pyro.module("decoder", self.decoder)
+        with pyro.plate("data", x.shape[0]):
+            z_loc = x.new_zeros(torch.Size((x.shape[0], self.params.z_dim)))
+            z_scale = x.new_ones(torch.Size((x.shape[0], self.params.z_dim)))
+            z = pyro.sample("latent", Normal(z_loc, z_scale).to_event(1))
+            res = self.decoder(z)
+            pyro.sample("obs", Bernoulli(res).to_event(1), obs=x)
 
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+    def guide(self, x):
+        pyro.module("encoder", self.encoder)
+        with pyro.plate("data", x.shape[0]):
+            z_loc, z_scale = self.encoder.forward(x)
+            pyro.sample("latent", Normal(z_loc, z_scale).to_event(1))
 
 #######################################################################################
 
@@ -239,57 +205,6 @@ def variable_normal(name, *shape):
     loc = pyro.param(name+"_loc", l)
     scale = F.softplus(pyro.param(name+"_scale", s))
     return Normal(loc, scale)
-
-#######################################################################################
-
-class Classifier(nn.Module):
-    def __init__(self, use_cuda=False):
-        super(Classifier, self).__init__()
-        self.encoder = Net()
-        self.log_softmax = nn.LogSoftmax(dim=1)
-        self.use_cuda = use_cuda
-
-        if self.use_cuda:
-            self.cuda()
-
-    def model(self, inputs, targets):
-        bs = targets.size(0)
-        priors = {}
-        for param, data in self.encoder.named_parameters():
-            # if 'weight' in param or 'bias' in param:
-            priors[param] = normal(data.shape)
-        lifted_module = pyro.random_module("encoder", self.encoder, priors)
-        lifted_reg_model = lifted_module()
-        # with pyro.plate("data", min(bs, 50)):
-        preds = lifted_reg_model(inputs)
-        pyro.sample("obs", Categorical(logits=preds), obs=targets)
-
-    def guide(self, inputs, targets):
-        dists = {}
-        for param, data in self.encoder.named_parameters():
-            # if 'weight' in param or 'bias' in param:
-            dists[param] = variable_normal(param, data.shape)
-        lifted_module = pyro.random_module("encoder", self.encoder, dists)
-        return lifted_module()
-
-    # def predict(self, x, num_samples=10):
-    #     sampled_models = [self.guide(None, None) for _ in range(num_samples)]
-    #     preds = [model(x.to(device)) for model in sampled_models]
-    #     preds = torch.stack(preds, dim=2)
-    #     mean = torch.mean(preds, dim=2)
-    #     return mean
-
-    def predict(self, x, num_samples=10):
-        sampled_models = [self.guide(None, None) for _ in range(num_samples)]
-        yhats = [model(x.to(device)).data for model in sampled_models]
-        mean = torch.mean(torch.stack(yhats), 0)
-        return mean.argmax(dim=1)
-
-    def sample(self, x, num_samples=100):
-        sampled_models = [self.guide(None, None) for _ in range(num_samples)]
-        preds = [model(x.to(device)) for model in sampled_models]
-        preds = torch.stack(preds, dim=2)
-        return preds
 
 #######################################################################################
 
