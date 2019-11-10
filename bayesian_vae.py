@@ -142,7 +142,6 @@ class Encoder(nn.Module):
 
         self.fc_scale = nn.Linear(in_sz, params.z_dim)
         self.fc_loc = nn.Linear(in_sz, params.z_dim)
-        self.softplus = nn.Softplus()
 
     def forward(self, x):
         x = self.rnn_enc(x)
@@ -158,11 +157,16 @@ class Decoder(nn.Module):
                           hidden_size=params.input_size, 
                           num_layers=params.nl, 
                           bias=False)
-
+        self.softplus = nn.Softplus()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, z):
-        pass
+        bs = z.size(0)
+        hidden = self.softplus(self.fc(z))
+        outp, _ = self.rnn(hidden)
+        outp = outp.view(bs, 1024)
+        outp = self.sigmoid(outp)
+        return outp
 
 class VAE(nn.Module):
     def __init__(self):
@@ -188,6 +192,12 @@ class VAE(nn.Module):
         with pyro.plate("data", x.shape[0]):
             z_loc, z_scale = self.encoder.forward(x)
             pyro.sample("latent", Normal(z_loc, z_scale).to_event(1))
+
+    def reconstruct(self, x):
+        z_loc, z_scale = self.encoder(x)
+        z = Normal(z_loc, z_scale).sample()
+        res = self.decoder(x)
+        return res
 
 #######################################################################################
 
@@ -220,9 +230,9 @@ def status(epoch, train_props, cv_props):
 if __name__ == "__main__":
     try:
         pyro.clear_param_store()
-        clf = Classifier()
+        vae = VAE()
         opt = ClippedAdam({"lr": 0.01, "clip_norm": 0.01})
-        svi = SVI(model=clf.model, guide=clf.guide, optim=opt, loss=Trace_ELBO())
+        svi = SVI(model=vae.model, guide=vae.guide, optim=opt, loss=Trace_ELBO())
         
         train_loader = torch.load('train_loader.pt')
         cv_loader = torch.load('cv_loader.pt')
@@ -232,20 +242,16 @@ if __name__ == "__main__":
         for epoch in tqdm(range(epochs)):
             train_props = {k:0 for k in status_properties}
             for i, data in enumerate(train_loader):
-                clf.train()
+                vae.train()
                 x, targets = data
                 x = x.to(device)
                 targets = targets.to(device)
                 targets = targets.view(-1)
                 loss = svi.step(x, targets)
                 train_props['loss'] += loss
-                preds = clf.predict(x)
-                a = (preds == targets).float().mean()#accuracy(preds, targets)
-                # a, a1, a2, a3 = accuracy(preds, targets)
+                preds = vae.predict(x)
+                a = (preds == targets).float().mean()
                 train_props['accuracy'] += a.item()
-                # train_props['accuracy_1'] += a1
-                # train_props['accuracy_2'] += a2
-                # train_props['accuracy_3'] += a3
             L = len(train_loader)
             train_props = {k:v/L for k,v in train_props.items()}
 
@@ -255,28 +261,19 @@ if __name__ == "__main__":
                 targets = targets.view(-1)
                 x = x.to(device)
                 targets = targets.to(device)
-                clf.eval()
-                preds = clf.predict(x)
+                vae.eval()
+                preds = vae.predict(x)
                 cv_props['loss'] += svi.evaluate_loss(x, targets)
-                # preds = F.log_softmax(preds, dim=1)
-                # preds = torch.argmax(preds, dim=1)
-                # a, a1, a2, a3 = accuracy(preds, targets)
-                # a = accuracy(preds, targets)
                 a = (preds == targets).float().mean()
                 cv_props['accuracy'] += a.item()
-                # cv_props['accuracy_1'] += a1
-                # cv_props['accuracy_2'] += a2
-                # cv_props['accuracy_3'] += a3
             L = len(cv_loader)
             cv_props = {k:v/L for k,v in cv_props.items()}
             if cv_props['loss'] < best_loss:
                 print('Saving state')
-                state = {'state_dict': clf.state_dict(), 'train_props': train_props, 'cv_props': cv_props}
+                state = {'state_dict': vae.state_dict(), 'train_props': train_props, 'cv_props': cv_props}
                 torch.save(state, 'nn_state.pth.tar')
                 torch.save(opt, 'nn_opt.pth.tar')
                 best_loss = cv_props['loss']
             status(epoch, train_props, cv_props)
     except KeyboardInterrupt:
-        # pd.to_pickle(mdl.train_loss, 'train_loss.pkl')
-        # pd.to_pickle(mdl.cv_loss, 'cv_loss.pkl')
         print('Stopping')
