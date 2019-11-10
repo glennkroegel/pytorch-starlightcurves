@@ -28,6 +28,17 @@ class TSDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.x)
 
+class VAEDataset(torch.utils.data.Dataset):
+    def __init__(self, x):
+        self.x = torch.FloatTensor(x)
+
+    def __getitem__(self, i):
+        x = self.x[i]
+        return x
+    
+    def __len__(self):
+        return len(self.x)
+
 class DataLoaderFactory():
     '''Standard dataloaders with regular collating/sampling from padded dataset'''
     def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
@@ -59,7 +70,7 @@ class DataLoaderFactory():
         torch.save(self.cv_loader, 'cv_loader.pt')
 
 class BalancedDataLoaderFactory():
-    '''Standard dataloaders with regular collating/sampling from padded dataset'''
+    '''Dataloader generation for balanced classes given a sample size selection'''
     def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
         pass
 
@@ -98,4 +109,26 @@ class BalancedDataLoaderFactory():
     def save_loaders(self):
         torch.save(self.train_loader, 'train_loader.pt')
         torch.save(self.cv_loader, 'cv_loader.pt')
+
+
+class VAEDataLoaderFactory():
+    '''Dataloader generation for balanced classes given a sample size selection'''
+    def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
+        pass
+
+    def gen_loaders(self, n_samples=3000, test_size=0.1, batch_size=50):
+        train_data = pd.read_csv(TRAIN_DATA, delimiter='\t', header=None)
+        cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
+        df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)
+        df = df.sample(n=n_samples)
+        df.drop(0, axis=1, inplace=True)
+        df_train, df_cv = train_test_split(df, test_size=test_size, random_state=42)
+        train_data = df_train.values.astype(np.float32)
+        cv_data = df_cv.values.astype(np.float32)
+        train_set = VAEDataset(train_data)
+        cv_set = VAEDataset(cv_data)
+        train_loader = DataLoader(train_set, batch_size=batch_size)
+        cv_loader = DataLoader(cv_set, batch_size=batch_size)
+        torch.save(train_loader, 'vae_train_loader.pt')
+        torch.save(cv_loader, 'vae_cv_loader.pt')
 

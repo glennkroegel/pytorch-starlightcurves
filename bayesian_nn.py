@@ -82,7 +82,7 @@ class ResBlock(nn.Module):
         self.c2 = Conv(n, n)
 
     def forward(self, x):
-        return x + self.c2(self.c1(x))
+        return torch.norm(x, dim=1) + self.c2(self.c1(x))
 
 class ConvResBlock(nn.Module):
     def __init__(self, in_c, out_c):
@@ -189,15 +189,17 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         encoder = RNNEncoder().to(device)
+        encoder.eval()
         x = torch.randn(1, 1024)
         x.requires_grad_(False)
         x = encoder(x.to(device))
         head = FeedForward(x.size()).to(device)
-        layers = [encoder, head]
+        layers = [encoder.train(), head.train()]
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
         bs = x.size(0)
+        x = F.max_pool1d(x.unsqueeze(1), 10).squeeze()
         x = self.layers(x)
         x = x.view(bs, 3)
         return x 
@@ -256,7 +258,6 @@ class Classifier(nn.Module):
         bs = targets.size(0)
         priors = {}
         for param, data in self.encoder.named_parameters():
-            # if 'weight' in param or 'bias' in param:
             priors[param] = normal(data.shape)
         lifted_module = pyro.random_module("encoder", self.encoder, priors)
         lifted_reg_model = lifted_module()
@@ -306,7 +307,7 @@ if __name__ == "__main__":
     try:
         pyro.clear_param_store()
         clf = Classifier()
-        opt = ClippedAdam({"lr": 0.01, "clip_norm": 0.01})
+        opt = ClippedAdam({"lr": 0.001, "clip_norm": 0.5})
         svi = SVI(model=clf.model, guide=clf.guide, optim=opt, loss=Trace_ELBO())
         
         train_loader = torch.load('train_loader.pt')

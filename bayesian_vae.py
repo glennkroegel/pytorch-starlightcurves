@@ -28,6 +28,8 @@ from pyro.optim import Adam, ClippedAdam, SGD
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 status_properties = ['loss']
 
+# https://github.com/kefirski/pytorch_RVAE/blob/master/model/decoder.py
+
 class Dense(nn.Module):
     def __init__(self, in_size, out_size, bias=False):
         super(Dense, self).__init__()
@@ -78,9 +80,9 @@ class ConvResBlock(nn.Module):
 class ConvolutionalEncoder(nn.Module):
     def __init__(self):
         super(ConvolutionalEncoder, self).__init__()
-        self.c1 = ConvResBlock(1, 3)
+        self.c1 = ConvResBlock(1, 10)
         self.pool = nn.AdaptiveMaxPool1d(10)
-        self.fc = Dense(30, 10)
+        self.fc = Dense(100, 10)
         self.out = nn.Linear(10, 3)
 
     def forward(self, x):
@@ -104,6 +106,7 @@ class Parameters:
             self.direction = 2
         self.sl = 1024
         self.z_dim = 20
+        self.decoder_hidden = 8
 
 class RNNEncoder(nn.Module):
     def __init__(self, params):
@@ -151,21 +154,27 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, params):
-        self.fc = nn.Linear(params.z_dim, params.hidden_dim)
+        super(Decoder, self).__init__()
+        self.params = params
+        self.fc = nn.Linear(params.z_dim, params.decoder_hidden)
         self.rnn = nn.GRU(input_size=params.hidden_dim, 
                           bidirectional=params.bidir, 
-                          hidden_size=params.input_size, 
+                          hidden_size=params.decoder_hidden, 
                           num_layers=params.nl, 
                           bias=False)
+        self.fc_out = nn.Linear(params.decoder_hidden, 1)
         self.softplus = nn.Softplus()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, z):
         bs = z.size(0)
         hidden = self.softplus(self.fc(z))
-        outp, _ = self.rnn(hidden)
-        outp = outp.view(bs, 1024)
+        hidden = hidden.unsqueeze(0)
+        x = torch.zeros(1024, bs, self.params.hidden_dim)
+        outp, _ = self.rnn(x, hidden)
+        outp = self.fc_out(outp)
         outp = self.sigmoid(outp)
+        outp = outp.squeeze().transpose(0,1)
         return outp
 
 class VAE(nn.Module):
@@ -196,27 +205,8 @@ class VAE(nn.Module):
     def reconstruct(self, x):
         z_loc, z_scale = self.encoder(x)
         z = Normal(z_loc, z_scale).sample()
-        res = self.decoder(x)
+        res = self.decoder(z)
         return res
-
-#######################################################################################
-
-def normal(*shape):
-    loc = torch.zeros(*shape).to(device)
-    scale = torch.ones(*shape).to(device)
-    dist = Normal(loc, scale)#.independent(1)
-    return dist
-
-def variable_normal(name, *shape):
-    l = torch.empty(*shape, requires_grad=True, device=device)
-    s = torch.empty(*shape, requires_grad=True, device=device)
-    torch.nn.init.normal_(l, mean=0, std=0.01)
-    torch.nn.init.normal_(s, mean=0, std=0.01)
-    loc = pyro.param(name+"_loc", l)
-    scale = F.softplus(pyro.param(name+"_scale", s))
-    return Normal(loc, scale)
-
-#######################################################################################
 
 def status(epoch, train_props, cv_props):
     s0 = 'epoch {0}/{1}\n'.format(epoch, NUM_EPOCHS)
@@ -231,41 +221,29 @@ if __name__ == "__main__":
     try:
         pyro.clear_param_store()
         vae = VAE()
-        opt = ClippedAdam({"lr": 0.01, "clip_norm": 0.01})
+        opt = ClippedAdam({"lr": 0.01, "clip_norm": 0.25})
         svi = SVI(model=vae.model, guide=vae.guide, optim=opt, loss=Trace_ELBO())
         
-        train_loader = torch.load('train_loader.pt')
-        cv_loader = torch.load('cv_loader.pt')
+        train_loader = torch.load('vae_train_loader.pt')
+        cv_loader = torch.load('vae_cv_loader.pt')
         epochs = NUM_EPOCHS
         num_iter = 5
         best_loss = 1e50
         for epoch in tqdm(range(epochs)):
             train_props = {k:0 for k in status_properties}
-            for i, data in enumerate(train_loader):
+            for i, x in enumerate(train_loader):
                 vae.train()
-                x, targets = data
                 x = x.to(device)
-                targets = targets.to(device)
-                targets = targets.view(-1)
-                loss = svi.step(x, targets)
+                loss = svi.step(x)
                 train_props['loss'] += loss
-                preds = vae.predict(x)
-                a = (preds == targets).float().mean()
-                train_props['accuracy'] += a.item()
             L = len(train_loader)
             train_props = {k:v/L for k,v in train_props.items()}
 
             cv_props = {k:0 for k in status_properties}
-            for j, data in enumerate(cv_loader):
-                x, targets = data
-                targets = targets.view(-1)
+            for j, x in enumerate(cv_loader):
                 x = x.to(device)
-                targets = targets.to(device)
                 vae.eval()
-                preds = vae.predict(x)
-                cv_props['loss'] += svi.evaluate_loss(x, targets)
-                a = (preds == targets).float().mean()
-                cv_props['accuracy'] += a.item()
+                cv_props['loss'] += svi.evaluate_loss(x)
             L = len(cv_loader)
             cv_props = {k:v/L for k,v in cv_props.items()}
             if cv_props['loss'] < best_loss:
