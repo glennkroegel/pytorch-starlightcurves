@@ -16,8 +16,9 @@ import torch.utils.data as data_utils
 from torch.nn.utils import clip_grad_norm_
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 from tqdm import tqdm
-from utils import count_parameters, accuracy, bce_acc, accuracy_from_logits
+from utils import count_parameters, accuracy, bce_acc, accuracy_from_logits, one_hot
 from config import NUM_EPOCHS
+from losses import BCEDiceLoss
 from callbacks import Hook
 import shutil
 
@@ -112,7 +113,7 @@ class RNNEncoder(nn.Module):
         super(RNNEncoder, self).__init__()
         self.nl = 1
         self.input_dim = 1
-        self.hidden_dim = 10
+        self.hidden_dim = 16
         self.bidir = False
         self.direction = 1
         if self.bidir:
@@ -166,7 +167,7 @@ class FeedForward(nn.Module):
         else:
             self.in_feats = in_shp[1]
         # self.fc = Dense(self.in_feats, 10)
-        self.out = nn.Linear(10, 3)
+        self.out = nn.Linear(self.in_feats, 3)
 
     def forward(self, x):
         bs = x.size(0)
@@ -182,11 +183,11 @@ class Classifier(nn.Module):
         # hooks, _, enc_szs = get_hooks(encoder)
         # idxs = list(enc_szs.keys())
         # x_sz = enc_szs[len(enc_szs) - 1]
-        x = torch.randn(1, 1024)
+        x = torch.randn(1, 128)
         x.requires_grad_(False)
         x = encoder(x.to(device))
         head = FeedForward(x.size()).to(device)
-        layers = [encoder.to(device), head.to(device)]
+        layers = [encoder.train(), head.train()]
         [print(count_parameters(x)) for x in layers]
         self.layers = nn.Sequential(*layers)
 
@@ -237,9 +238,11 @@ class BaseLearner():
             x = x.to(device)
             targets = targets.view(-1).to(device)
             preds = model(x)
+            if isinstance(self.criterion, BCEDiceLoss):
+                targets = one_hot(targets, 3)
             loss = criterion(preds, targets)
             props['loss'] += loss.item()
-            a, a1, a2, a3 = accuracy_from_logits(preds, targets)
+            a, a1, a2, a3 = accuracy_from_logits(preds.clone(), targets.clone())
             props['accuracy'] += a.item()
             props['accuracy_1'] += a1
             props['accuracy_2'] += a2

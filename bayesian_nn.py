@@ -181,7 +181,6 @@ class FeedForward(nn.Module):
     def forward(self, x):
         bs = x.size(0)
         x = x.view(bs, -1)
-        # x = self.fc(x)
         x = self.out(x)
         return x
 
@@ -199,7 +198,6 @@ class Net(nn.Module):
 
     def forward(self, x):
         bs = x.size(0)
-        x = F.max_pool1d(x.unsqueeze(1), 10).squeeze()
         x = self.layers(x)
         x = x.view(bs, 3)
         return x 
@@ -207,16 +205,17 @@ class Net(nn.Module):
 class BasicEncoder(nn.Module):
     def __init__(self):
         super(BasicEncoder, self).__init__()
-        self.fc1 = nn.Linear(1024, 20, bias=False)
-        self.fc2 = nn.Linear(20, 3, bias=False)
+        self.fc1 = nn.Linear(128, 20, bias=False)
+        self.fc_out = nn.Linear(20, 3, bias=True)
         self.act = nn.LeakyReLU()
 
     def forward(self, x):
         bs = x.size(0)
         x = x.view(bs, -1)
         x = self.act(self.fc1(x))
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
+        x = self.fc_out(x)
+        # return F.log_softmax(x, dim=1)
+        return x
 
 ###########################################################################
 
@@ -247,7 +246,7 @@ def variable_normal(name, *shape):
 class Classifier(nn.Module):
     def __init__(self, use_cuda=False):
         super(Classifier, self).__init__()
-        self.encoder = Net()
+        self.encoder = BasicEncoder()#Net()
         self.log_softmax = nn.LogSoftmax(dim=1)
         self.use_cuda = use_cuda
 

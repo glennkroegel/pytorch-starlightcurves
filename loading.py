@@ -8,6 +8,7 @@ description: Create dataloaders to feed for training
 import pandas as pd
 import numpy as np
 from config import TRAIN_DATA, CV_DATA
+from utils import pooling
 
 import torch
 import os
@@ -74,7 +75,7 @@ class BalancedDataLoaderFactory():
     def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
         pass
 
-    def gen_loaders(self, n_samples=1500, test_size=0.1, batch_size=16):
+    def gen_loaders(self, n_samples=1500, test_size=0.1, batch_size=16, pool=None):
         train_data = pd.read_csv(TRAIN_DATA, delimiter='\t', header=None)
         cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
         df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)
@@ -94,6 +95,9 @@ class BalancedDataLoaderFactory():
         df_cv.drop('y', axis=1, inplace=True)
         train_data = df_train.values.astype(np.float32)
         cv_data = df_cv.values.astype(np.float32)
+        if pool:
+            train_data = pooling(train_data, (1,pool))
+            cv_data = pooling(cv_data, (1,pool))
         train_set = TSDataset(train_data, train_y)
         cv_set = TSDataset(cv_data, cv_y)
         train_loader = DataLoader(train_set, batch_size=batch_size, drop_last=True)
