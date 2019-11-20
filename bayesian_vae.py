@@ -158,10 +158,10 @@ class ConvEnc(nn.Module):
         self.c1 = nn.Conv1d(1, 5, kernel_size=3, padding=1)
         self.c2 = nn.Conv1d(5, 10, kernel_size=3, padding=1)
         self.act = nn.LeakyReLU(negative_slope=0.25)
-        self.pool = nn.AdaptiveMaxPool1d(10)
+        self.pool = nn.AdaptiveMaxPool1d(40)
         
-        self.fc_scale = nn.Linear(100, 50)
-        self.fc_loc = nn.Linear(100, 50)
+        self.fc_scale = nn.Linear(100, params.z_dim)
+        self.fc_loc = nn.Linear(100, params.z_dim)
 
     def forward(self, x):
         bs = x.size(0)
@@ -171,7 +171,7 @@ class ConvEnc(nn.Module):
         x = self.pool(x)
         x = x.view(bs, -1)
         z_loc = self.fc_loc(x)
-        z_scale = self.fc_scale(x)
+        z_scale = torch.exp(self.fc_scale(x))
         return z_loc, z_scale
 
 class ConvDec(nn.Module):
@@ -180,7 +180,7 @@ class ConvDec(nn.Module):
         self.params = params
         self.c1 = nn.Conv1d(10, 5, kernel_size=3, padding=1)
         self.c2 = nn.Conv1d(5, 1, kernel_size=3, padding=1)
-        self.fc = nn.Linear(50, 100)
+        self.fc = nn.Linear(params.z_dim, 100)
         self.act = nn.LeakyReLU(negative_slope=0.25)
         self.softplus = nn.Softplus()
         self.sigmoid = nn.Sigmoid()
@@ -191,8 +191,9 @@ class ConvDec(nn.Module):
         x = x.view(bs, 10, 10)
         x = F.interpolate(x, self.params.sl)
         x = self.act(self.c1(x))
-        x = self.sigmoid(self.c2(x))
-        x = x.view(bs, self.params.sl)
+        x = self.act(self.c2(x))
+        x = self.sigmoid(x)
+        x = x.squeeze()
         return x
 
 class Decoder(nn.Module):
@@ -264,7 +265,7 @@ if __name__ == "__main__":
     try:
         pyro.clear_param_store()
         vae = VAE()
-        opt = ClippedAdam({"lr": 0.01, "clip_norm": 0.25})
+        opt = ClippedAdam({"lr": 0.0001, "clip_norm": 0.25})
         svi = SVI(model=vae.model, guide=vae.guide, optim=opt, loss=Trace_ELBO())
         
         train_loader = torch.load('vae_train_loader.pt')
