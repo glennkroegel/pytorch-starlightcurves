@@ -75,7 +75,7 @@ class BalancedDataLoaderFactory():
     def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
         pass
 
-    def gen_loaders(self, n_samples=1500, test_size=0.1, batch_size=16, pool=None):
+    def gen_loaders(self, n_samples=5000, test_size=0.2, batch_size=500, pool=8):
         train_data = pd.read_csv(TRAIN_DATA, delimiter='\t', header=None)
         cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
         df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)

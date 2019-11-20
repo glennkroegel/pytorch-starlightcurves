@@ -108,6 +108,21 @@ class ConvolutionalEncoder(nn.Module):
         x = self.out(x)
         return x
 
+class SimpleConvolutionalEncoder(nn.Module):
+    def __init__(self):
+        super(SimpleConvolutionalEncoder, self).__init__()
+        self.c1 = nn.Conv1d(1, 5, kernel_size=3)
+        self.pool = nn.AdaptiveMaxPool1d(10)
+        self.act = nn.PReLU(num_parameters=5)
+
+    def forward(self, x):
+        bs = x.size(0)
+        x = x.unsqueeze(1)
+        x = self.act(self.c1(x))
+        x = self.pool(x)
+        x = x.view(bs, -1)
+        return x
+
 class RNNEncoder(nn.Module):
     def __init__(self):
         super(RNNEncoder, self).__init__()
@@ -179,7 +194,7 @@ class FeedForward(nn.Module):
 class Classifier(nn.Module):
     def __init__(self, use_cuda=False):
         super(Classifier, self).__init__()
-        encoder = RNNEncoder().to(device)
+        encoder = SimpleConvolutionalEncoder().to(device)#RNNEncoder().to(device)
         # hooks, _, enc_szs = get_hooks(encoder)
         # idxs = list(enc_szs.keys())
         # x_sz = enc_szs[len(enc_szs) - 1]

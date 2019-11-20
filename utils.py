@@ -19,8 +19,8 @@ def accuracy_from_logits(input, targs):
     "Compute accuracy with `targs` when `input` is bs * n_classes."
     n = targs.shape[0]
     # inp = input.view(n, -1)
-    inp = input.argmax(dim=-1).view(n, -1)
-    targs = targs.argmax(dim=-1).view(n, -1)
+    inp = input.argmax(dim=-1).view(-1)
+    # targs = targs.argmax(dim=-1).view(-1)
     ix1 = (targs == 0).nonzero().squeeze()
     ix2 = (targs == 1).nonzero().squeeze()
     ix3 = (targs == 2).nonzero().squeeze()

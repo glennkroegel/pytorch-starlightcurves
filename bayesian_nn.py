@@ -115,6 +115,23 @@ class ConvolutionalEncoder(nn.Module):
         x = self.out(x)
         return x
 
+class SimpleConvolutionalEncoder(nn.Module):
+    def __init__(self):
+        super(SimpleConvolutionalEncoder, self).__init__()
+        self.c1 = nn.Conv1d(1, 5, kernel_size=3)
+        self.pool = nn.AdaptiveMaxPool1d(10)
+        self.act = nn.LeakyReLU(negative_slope=0.3)
+        self.out = nn.Linear(50, 3)
+
+    def forward(self, x):
+        bs = x.size(0)
+        x = x.unsqueeze(1)
+        x = self.act(self.c1(x))
+        x = self.pool(x)
+        x = x.view(bs, -1)
+        x = self.out(x)
+        return x
+
 class RNNEncoder(nn.Module):
     def __init__(self):
         super(RNNEncoder, self).__init__()
@@ -189,7 +206,7 @@ class Net(nn.Module):
         super(Net, self).__init__()
         encoder = RNNEncoder().to(device)
         encoder.eval()
-        x = torch.randn(1, 1024)
+        x = torch.randn(1, 128)
         x.requires_grad_(False)
         x = encoder(x.to(device))
         head = FeedForward(x.size()).to(device)
@@ -206,15 +223,16 @@ class BasicEncoder(nn.Module):
     def __init__(self):
         super(BasicEncoder, self).__init__()
         self.fc1 = nn.Linear(128, 20, bias=False)
-        self.fc_out = nn.Linear(20, 3, bias=True)
-        self.act = nn.LeakyReLU()
+        self.fc2 = nn.Linear(20, 10, bias=False)
+        self.fc_out = nn.Linear(10, 3, bias=True)
+        self.act = nn.LeakyReLU(negative_slope=0.5)
 
     def forward(self, x):
         bs = x.size(0)
         x = x.view(bs, -1)
         x = self.act(self.fc1(x))
+        x = self.act(self.fc2(x))
         x = self.fc_out(x)
-        # return F.log_softmax(x, dim=1)
         return x
 
 ###########################################################################
@@ -246,7 +264,7 @@ def variable_normal(name, *shape):
 class Classifier(nn.Module):
     def __init__(self, use_cuda=False):
         super(Classifier, self).__init__()
-        self.encoder = BasicEncoder()#Net()
+        self.encoder = SimpleConvolutionalEncoder()#BasicEncoder()#Net()
         self.log_softmax = nn.LogSoftmax(dim=1)
         self.use_cuda = use_cuda
 
@@ -262,6 +280,7 @@ class Classifier(nn.Module):
         lifted_reg_model = lifted_module()
         # with pyro.plate("data", min(bs, 50)):
         preds = lifted_reg_model(inputs)
+        preds = F.log_softmax(preds, dim=1)
         pyro.sample("obs", Categorical(logits=preds), obs=targets)
 
     def guide(self, inputs, targets):
@@ -279,9 +298,9 @@ class Classifier(nn.Module):
     #     mean = torch.mean(preds, dim=2)
     #     return mean
 
-    def predict(self, x, num_samples=10):
+    def predict(self, x, num_samples=1000):
         sampled_models = [self.guide(None, None) for _ in range(num_samples)]
-        yhats = [model(x.to(device)).data for model in sampled_models]
+        yhats = [F.log_softmax(model(x.to(device)), dim=-1).data for model in sampled_models]
         mean = torch.mean(torch.stack(yhats), 0)
         return mean.argmax(dim=1)
 
@@ -306,7 +325,7 @@ if __name__ == "__main__":
     try:
         pyro.clear_param_store()
         clf = Classifier()
-        opt = ClippedAdam({"lr": 0.001, "clip_norm": 0.5})
+        opt = ClippedAdam({"lr": 0.01, "clip_norm": 0.5})
         svi = SVI(model=clf.model, guide=clf.guide, optim=opt, loss=Trace_ELBO())
         
         train_loader = torch.load('train_loader.pt')
@@ -324,6 +343,7 @@ if __name__ == "__main__":
                 targets = targets.view(-1)
                 loss = svi.step(x, targets)
                 train_props['loss'] += loss
+                clf.eval()
                 preds = clf.predict(x)
                 a = (preds == targets).float().mean()#accuracy(preds, targets)
                 # a, a1, a2, a3 = accuracy(preds, targets)
@@ -356,7 +376,7 @@ if __name__ == "__main__":
             cv_props = {k:v/L for k,v in cv_props.items()}
             if cv_props['loss'] < best_loss:
                 print('Saving state')
-                state = {'state_dict': clf.state_dict(), 'train_props': train_props, 'cv_props': cv_props}
+                state = {'state_dict': clf.state_dict(), 'train_props': train_props, 'cv_props': cv_props, 'epoch': epoch}
                 torch.save(state, 'nn_state.pth.tar')
                 torch.save(opt, 'nn_opt.pth.tar')
                 best_loss = cv_props['loss']
