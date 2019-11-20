@@ -278,10 +278,10 @@ class Classifier(nn.Module):
             priors[param] = normal(data.shape)
         lifted_module = pyro.random_module("encoder", self.encoder, priors)
         lifted_reg_model = lifted_module()
-        # with pyro.plate("data", min(bs, 50)):
-        preds = lifted_reg_model(inputs)
-        preds = F.log_softmax(preds, dim=1)
-        pyro.sample("obs", Categorical(logits=preds), obs=targets)
+        with pyro.plate("data", bs):
+            preds = lifted_reg_model(inputs)
+            preds = F.log_softmax(preds, dim=1)
+            pyro.sample("obs", Categorical(logits=preds), obs=targets)
 
     def guide(self, inputs, targets):
         dists = {}
@@ -333,6 +333,7 @@ if __name__ == "__main__":
         epochs = NUM_EPOCHS
         num_iter = 5
         best_loss = 1e50
+        best_acc = 0.0
         for epoch in tqdm(range(epochs)):
             train_props = {k:0 for k in status_properties}
             for i, data in enumerate(train_loader):
@@ -341,9 +342,8 @@ if __name__ == "__main__":
                 x = x.to(device)
                 targets = targets.to(device)
                 targets = targets.view(-1)
-                loss = svi.step(x, targets)
+                loss = svi.step(x, targets, annealing_factor=0.5)
                 train_props['loss'] += loss
-                clf.eval()
                 preds = clf.predict(x)
                 a = (preds == targets).float().mean()#accuracy(preds, targets)
                 # a, a1, a2, a3 = accuracy(preds, targets)
@@ -374,12 +374,14 @@ if __name__ == "__main__":
                 # cv_props['accuracy_3'] += a3
             L = len(cv_loader)
             cv_props = {k:v/L for k,v in cv_props.items()}
-            if cv_props['loss'] < best_loss:
+            # if cv_props['loss'] < best_loss:
+            if cv_props['accuracy'] > best_acc:
                 print('Saving state')
                 state = {'state_dict': clf.state_dict(), 'train_props': train_props, 'cv_props': cv_props, 'epoch': epoch}
                 torch.save(state, 'nn_state.pth.tar')
                 torch.save(opt, 'nn_opt.pth.tar')
                 best_loss = cv_props['loss']
+                best_acc = cv_props['accuracy']
             status(epoch, train_props, cv_props)
     except KeyboardInterrupt:
         # pd.to_pickle(mdl.train_loss, 'train_loss.pkl')

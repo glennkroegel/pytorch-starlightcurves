@@ -104,8 +104,8 @@ class Parameters:
         self.direction = 1
         if self.bidir:
             self.direction = 2
-        self.sl = 1024
-        self.z_dim = 20
+        self.sl = 128
+        self.z_dim = 50
         self.decoder_hidden = 8
 
 class RNNEncoder(nn.Module):
@@ -152,6 +152,49 @@ class Encoder(nn.Module):
         z_scale = torch.exp(self.fc_scale(x))
         return z_loc, z_scale
 
+class ConvEnc(nn.Module):
+    def __init__(self, params):
+        super(ConvEnc, self).__init__()
+        self.c1 = nn.Conv1d(1, 5, kernel_size=3, padding=1)
+        self.c2 = nn.Conv1d(5, 10, kernel_size=3, padding=1)
+        self.act = nn.LeakyReLU(negative_slope=0.25)
+        self.pool = nn.AdaptiveMaxPool1d(10)
+        
+        self.fc_scale = nn.Linear(100, 50)
+        self.fc_loc = nn.Linear(100, 50)
+
+    def forward(self, x):
+        bs = x.size(0)
+        x.unsqueeze_(1)
+        x = self.act(self.c1(x))
+        x = self.act(self.c2(x))
+        x = self.pool(x)
+        x = x.view(bs, -1)
+        z_loc = self.fc_loc(x)
+        z_scale = self.fc_scale(x)
+        return z_loc, z_scale
+
+class ConvDec(nn.Module):
+    def __init__(self, params):
+        super(ConvDec, self).__init__()
+        self.params = params
+        self.c1 = nn.Conv1d(10, 5, kernel_size=3, padding=1)
+        self.c2 = nn.Conv1d(5, 1, kernel_size=3, padding=1)
+        self.fc = nn.Linear(50, 100)
+        self.act = nn.LeakyReLU(negative_slope=0.25)
+        self.softplus = nn.Softplus()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, z):
+        bs = z.size(0)
+        x = self.softplus(self.fc(z))
+        x = x.view(bs, 10, 10)
+        x = F.interpolate(x, self.params.sl)
+        x = self.act(self.c1(x))
+        x = self.sigmoid(self.c2(x))
+        x = x.view(bs, self.params.sl)
+        return x
+
 class Decoder(nn.Module):
     def __init__(self, params):
         super(Decoder, self).__init__()
@@ -181,8 +224,8 @@ class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
         self.params = Parameters()
-        self.encoder = Encoder(self.params)
-        self.decoder = Decoder(self.params)
+        self.encoder = ConvEnc(self.params)
+        self.decoder = ConvDec(self.params)
 
         if torch.cuda.is_available():
             self.cuda()

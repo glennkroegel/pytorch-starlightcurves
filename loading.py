@@ -75,7 +75,7 @@ class BalancedDataLoaderFactory():
     def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
         pass
 
-    def gen_loaders(self, n_samples=5000, test_size=0.2, batch_size=500, pool=8):
+    def gen_loaders(self, n_samples=2000, test_size=0.2, batch_size=200, pool=8):
         train_data = pd.read_csv(TRAIN_DATA, delimiter='\t', header=None)
         cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
         df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)
@@ -120,7 +120,7 @@ class VAEDataLoaderFactory():
     def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
         pass
 
-    def gen_loaders(self, n_samples=3000, test_size=0.1, batch_size=50):
+    def gen_loaders(self, n_samples=3000, test_size=0.1, batch_size=50, pool=8):
         train_data = pd.read_csv(TRAIN_DATA, delimiter='\t', header=None)
         cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
         df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)
@@ -129,6 +129,9 @@ class VAEDataLoaderFactory():
         df_train, df_cv = train_test_split(df, test_size=test_size, random_state=42)
         train_data = df_train.values.astype(np.float32)
         cv_data = df_cv.values.astype(np.float32)
+        if pool:
+            train_data = pooling(train_data, (1,pool))
+            cv_data = pooling(cv_data, (1,pool))
         train_set = VAEDataset(train_data)
         cv_set = VAEDataset(cv_data)
         train_loader = DataLoader(train_set, batch_size=batch_size)
