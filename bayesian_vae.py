@@ -98,15 +98,16 @@ class ConvolutionalEncoder(nn.Module):
 class Parameters:
     def __init__(self):
         self.input_dim = 1
-        self.hidden_dim = 20
-        self.nl = 1
+        self.hidden_dim = 12
+        self.nl = 2
         self.bidir = False
         self.direction = 1
         if self.bidir:
             self.direction = 2
         self.sl = 128
-        self.z_dim = 50
+        self.z_dim = 20
         self.decoder_hidden = 8
+        self.rnn_out_sz = self.hidden_dim * self.nl * self.direction
 
 class RNNEncoder(nn.Module):
     def __init__(self, params):
@@ -117,6 +118,7 @@ class RNNEncoder(nn.Module):
                           hidden_size=params.hidden_dim, 
                           num_layers=params.nl, 
                           bias=False)
+        self.fc = nn.Sequential(nn.Linear(params.rnn_out_sz, 40), nn.Tanh(), nn.Linear(40, 20))
 
     def init_hidden(self, batch_size):
         h0 = torch.zeros(self.params.nl*self.params.direction, batch_size, self.params.hidden_dim)
@@ -129,6 +131,7 @@ class RNNEncoder(nn.Module):
         h0 = self.init_hidden(bs)
         outp, hidden = self.rnn(x, h0)
         x = hidden.view(bs, -1)
+        x = self.fc(x)
         return x
 
 class Encoder(nn.Module):
@@ -137,7 +140,7 @@ class Encoder(nn.Module):
         self.rnn_enc = RNNEncoder(params)
 
         self.rnn_enc.eval()
-        x = torch.randn(1, 1024)
+        x = torch.randn(1, 128)
         x.requires_grad_(False)
         x = self.rnn_enc(x)
         in_sz = x.size(1) 
@@ -151,6 +154,16 @@ class Encoder(nn.Module):
         z_loc = self.fc_loc(x)
         z_scale = torch.exp(self.fc_scale(x))
         return z_loc, z_scale
+
+class Decoder(nn.Module):
+    def __init__(self, params):
+        super(Decoder, self).__init__()
+        self.params = params
+        self.decoder = nn.Sequential(nn.Linear(params.z_dim, params.sl))
+
+    def forward(self, z):
+        x = self.decoder(z)
+        return x
 
 class ConvEnc(nn.Module):
     def __init__(self, params):
@@ -196,9 +209,9 @@ class ConvDec(nn.Module):
         x = x.squeeze()
         return x
 
-class Decoder(nn.Module):
+class RNNDecoder(nn.Module):
     def __init__(self, params):
-        super(Decoder, self).__init__()
+        super(RNNDecoder, self).__init__()
         self.params = params
         self.fc = nn.Linear(params.z_dim, params.decoder_hidden)
         self.rnn = nn.GRU(input_size=params.hidden_dim, 
@@ -225,8 +238,8 @@ class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
         self.params = Parameters()
-        self.encoder = ConvEnc(self.params)
-        self.decoder = ConvDec(self.params)
+        self.encoder = Encoder(self.params)
+        self.decoder = Decoder(self.params)
 
         if torch.cuda.is_available():
             self.cuda()
@@ -265,7 +278,7 @@ if __name__ == "__main__":
     try:
         pyro.clear_param_store()
         vae = VAE()
-        opt = ClippedAdam({"lr": 0.0001, "clip_norm": 0.25})
+        opt = ClippedAdam({"lr": 0.01, "clip_norm": 0.25})
         svi = SVI(model=vae.model, guide=vae.guide, optim=opt, loss=Trace_ELBO())
         
         train_loader = torch.load('vae_train_loader.pt')
