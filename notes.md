@@ -37,3 +37,17 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - interpolation and extrapolation possible
 - to do extrapolation train on the first half and decode the second half. (so z can be a repr of whole signal or first half, rnn-vae is full signal interpretation)
 - mention dimensionality of input
+
+# Astronomy
+- A Search for Analogs of KIC8462852 A Proof of Concept and First Candidates - https://iopscience.iop.org/article/10.3847/2041-8213/ab2e77
+- https://www.skyandtelescope.com/astronomy-news/are-there-more-stars-like-boyajians-star/
+- Lots of stellar properties we can input into models (e.g. https://exoplanetarchive.ipac.caltech.edu/cgi-bin/)
+
+# Datasets
+- https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public
+- https://datahub.io/machine-learning/spectrometer : infrared - part of IRAS low resolution Spectrometer Database Source 
+- Gaia (used in search for analogs paper) - http://gea.esac.esa.int/archive/
+- Tess (basis of planet hunters) - https://archive.stsci.edu/tess/bulk_downloads.html
+- National Radio Observatory - https://archive.nrao.edu/archive/advquery.jsp
+- https://exoplanetarchive.ipac.caltech.edu/cgi-bin/ICETimeSeriesViewer
+- Kepler - https://www.nasa.gov/kepler/education/getlightcurves
