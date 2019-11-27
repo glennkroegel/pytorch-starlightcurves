@@ -43,10 +43,18 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - https://www.skyandtelescope.com/astronomy-news/are-there-more-stars-like-boyajians-star/
 - Lots of stellar properties we can input into models (e.g. https://exoplanetarchive.ipac.caltech.edu/cgi-bin/)
 
+# Similarity search
+- Reference Billion Scale Similarity Search
+- Curse of dimensionality
+- Approximate methods are used to handle the complexity - but tend to break down for high dimensions.
+- There is a requirement that the encoded data is loaded into memory, which increases proportionally to the latent dimension and number of samples. 
+- Obviously for large sky surveys this can be intensive. Product quantization is a methodology used to reduce this memory footprint while maintining high speed.
+- .
+
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public
 - https://datahub.io/machine-learning/spectrometer : infrared - part of IRAS low resolution Spectrometer Database Source 
-- Gaia (used in search for analogs paper) - http://gea.esac.esa.int/archive/
+- Gaia (used in search for analogs paper) - http://gea.esac.esa.int/archive/ - ts data has no ra or dec info
 - Tess (basis of planet hunters) - https://archive.stsci.edu/tess/bulk_downloads.html
 - National Radio Observatory - https://archive.nrao.edu/archive/advquery.jsp
 - https://exoplanetarchive.ipac.caltech.edu/cgi-bin/ICETimeSeriesViewer
