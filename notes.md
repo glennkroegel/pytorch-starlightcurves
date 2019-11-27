@@ -49,7 +49,7 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Approximate methods are used to handle the complexity - but tend to break down for high dimensions.
 - There is a requirement that the encoded data is loaded into memory, which increases proportionally to the latent dimension and number of samples. 
 - Obviously for large sky surveys this can be intensive. Product quantization is a methodology used to reduce this memory footprint while maintining high speed.
-- .
+- Find interesting object and plot the image frames (from tess, https://docs.lightkurve.org/quickstart.html)
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public
