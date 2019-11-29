@@ -7,6 +7,7 @@ description: Create dataloaders to feed for training
 '''
 import pandas as pd
 import numpy as np
+import glob
 from config import TRAIN_DATA, CV_DATA
 from utils import pooling
 
@@ -28,6 +29,35 @@ class TSDataset(torch.utils.data.Dataset):
     
     def __len__(self):
         return len(self.x)
+
+class TessDataset(torch.utils.data.Dataset):
+    def __init__(self, files):
+        self.files = files
+
+    def __getitem__(self, i):
+        data = np.load(self.files[i]).astype(np.float16)
+        data = torch.FloatTensor(data)
+        return data
+
+    def __len__(self):
+        return len(self.files)
+
+class TessLoaderFactory():
+    '''Load Tess time series data in batches for DL models'''
+    def __init__(self):
+        self.path = 'tess/processed'
+        self.files = glob.glob(os.path.join(self.path, '*.npy'))
+
+    def generate(self, batch_size=4, train_size=0.9):
+        L = int(train_size*len(self.files))
+        train_files = self.files[:L]
+        cv_files = self.files[L:]
+        train_ds = TessDataset(train_files)
+        cv_ds = TessDataset(cv_files)
+        train_loader = DataLoader(train_ds, batch_size=batch_size)
+        cv_loader = DataLoader(cv_ds, batch_size=batch_size)
+        torch.save(train_loader, 'tess_train.pt')
+        torch.save(cv_loader, 'tess_cv.pt')
 
 class VAEDataset(torch.utils.data.Dataset):
     def __init__(self, x):

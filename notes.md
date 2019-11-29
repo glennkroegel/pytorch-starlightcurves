@@ -42,6 +42,11 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - A Search for Analogs of KIC8462852 A Proof of Concept and First Candidates - https://iopscience.iop.org/article/10.3847/2041-8213/ab2e77
 - https://www.skyandtelescope.com/astronomy-news/are-there-more-stars-like-boyajians-star/
 - Lots of stellar properties we can input into models (e.g. https://exoplanetarchive.ipac.caltech.edu/cgi-bin/)
+- Keck observatory is optical and infrared and has detected the presence of a supermassive blackhole SagA* (http://www.keckobservatory.org/)
+- Gaia instrumentation - Blue and Red photometer for different wavelength bands - can be used as separate inputs and same procedure followed - https://en.wikipedia.org/wiki/Gaia_(spacecraft)#Scientific_instruments
+- Example between BP and RP correlating and observing, and how we can encode ts info and characteristics as encoding and cluster them.
+- Can do joint optical and infrared as well like Keck
+- We know Tabby's star is not aliens because it absorbs specific frequencies in infrared, meaning it is not opaque.
 
 # Similarity search
 - Reference Billion Scale Similarity Search
@@ -50,6 +55,9 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - There is a requirement that the encoded data is loaded into memory, which increases proportionally to the latent dimension and number of samples. 
 - Obviously for large sky surveys this can be intensive. Product quantization is a methodology used to reduce this memory footprint while maintining high speed.
 - Find interesting object and plot the image frames (from tess, https://docs.lightkurve.org/quickstart.html)
+- Highlighting by minimum normalized flux values we can see that they still end up in different locations on the TSNE diagram, as they have different characteristics. This is the advantage of representing time series in a non-linear way. 
+- Emphasize how you don't have to have query inps that are within the dataset, you can input whatever you want.
+- Gaia data is 200TB - should be possible to handle this with the above methods. We can encode lots of information into any dimension we want to save memory. More dims is more expressive but higher memory (tradeoff).
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public
@@ -59,3 +67,4 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - National Radio Observatory - https://archive.nrao.edu/archive/advquery.jsp
 - https://exoplanetarchive.ipac.caltech.edu/cgi-bin/ICETimeSeriesViewer
 - Kepler - https://www.nasa.gov/kepler/education/getlightcurves
+- Herschel Space Observatory - largest infrared telescope
