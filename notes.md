@@ -1,11 +1,21 @@
+# Challenges
+- Data can be missing or unevenly sampled.
+- Observations are usually short and have transients - this makes conventional signal processing difficult.
+- To get an interpretation we need the model to simply solve a task
+- In the case of time series, this can be interpolation, extrapolation or classification. 
+
+
 # Notes on Bayesnn
 If we have a network which can capture complex time series (including transients) and we have correct classification of objects, we can then begin to cluster these objects using a Bayesian NN.
 The inference algorithm SVI uses a stochasti    c gradient estimator to take gradient steps on an objective function, which in this case is given by the ELBO (the evidence lower bound). As the name indicates, the ELBO is a lower bound to the log evidence: logp(D). As we take gradient steps that maximize the ELBO, we move our guide q(⋅) closer to the exact posterior.
 The argument Trace_ELBO() constructs a version of the gradient estimator that doesn’t need access to the dependency structure of the model and guide. Since all the latent variables in our model are reparameterizable, this is the appropriate gradient estimator for our use case. (It’s also the default option.)
-Elbo is KLDiv (approximate posterior) and expected log likelihood (measures model fit)
+
+- Elbo is KLDiv (approximate posterior) and expected log likelihood (measures model fit). However, it is useful to anneal the KLDiv component during training. So we focus on model accuracy first and then focus on matching the distribution.
+
 more  good text - https://pyro.ai/examples/dmm.html
 https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-good-uncertainty-measure-for-deep-learning-models - The issue with many deep neural networks is that, although they tend to perform well for prediction, their estimated predicted probabilities produced by the output of a softmax layer can not reliably be used as the true probabilities (as a confidence for each label). In practice, they tend to be too high - neural networks are 'too confident' in their predictions. 
 - Variational bayes and the local reparameterization trick: We explore an as yet unexploited opportunity for drastically improving the efficiency of stochastic gradient variational Bayes (SGVB) with global model parameters. Regular SGVB estimators rely on sampling of parameters once per minibatch of data, and have variance that is constant w.r.t. the minibatch size. The efficiency of such estimators can be drastically improved upon by translating uncertainty about global parameters into local noise that is independent across datapoints in the minibatch
+- Annealing: to make training easier we make
 
 # VAE
 - The latent variable z describes local structure of each data point.
