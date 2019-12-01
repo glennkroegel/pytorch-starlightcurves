@@ -1,8 +1,12 @@
 '''
 created_by: Glenn Kroegel
-date: 2 August 2019
+date: 1 December 2019
 
 '''
+
+import sys
+sys.path.insert(0, '../')
+import latent_ode.lib as ode
 
 import pandas as pd
 import numpy as np
@@ -15,16 +19,91 @@ import torch.nn.functional as F
 import torch.utils.data as data_utils
 from torch.nn.utils import clip_grad_norm_
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
+from torch.distributions.normal import Normal
 from tqdm import tqdm
 from utils import count_parameters, accuracy, bce_acc, accuracy_from_logits, one_hot
 from config import NUM_EPOCHS
-from losses import BCEDiceLoss
-from callbacks import Hook
 import shutil
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+##################################################################
+# Options
+input_dim = 1
+classif_per_tp = False
+n_labels = 1
+obsrv_std = 0.01
+niters = 1
+status_properties = ['loss']
+latent_dim = 10
 
+##################################################################
+
+def create_LatentODE_model(args, input_dim, z0_prior, obsrv_std, device = device, 
+	classif_per_tp = False, n_labels = 1):
+
+    dim = latent_dim
+    ode_func_net = utils.create_net(dim, args.latents, 
+        n_layers = 1, n_units = 32, nonlinear = nn.Tanh)
+
+    gen_ode_func = ODEFunc(
+        input_dim = input_dim, 
+        latent_dim = latent_dim, 
+        ode_func_net = ode_func_net,
+        device = device).to(device)
+
+	z0_diffeq_solver = None
+	n_rec_dims = args.rec_dims # check what this is
+	enc_input_dim = int(input_dim) * 2 # we concatenate the mask
+	gen_data_dim = input_dim
+
+	z0_dim = latent_dim
+
+    ode_func_net = utils.create_net(n_rec_dims, n_rec_dims, 
+        n_layers = args.rec_layers, n_units = args.units, nonlinear = nn.Tanh)
+
+    rec_ode_func = ODEFunc(
+        input_dim = enc_input_dim, 
+        latent_dim = n_rec_dims,
+        ode_func_net = ode_func_net,
+        device = device).to(device)
+
+    z0_diffeq_solver = DiffeqSolver(enc_input_dim, rec_ode_func, "euler", args.latents, 
+        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+    
+    encoder_z0 = Encoder_z0_ODE_RNN(n_rec_dims, enc_input_dim, z0_diffeq_solver, 
+        z0_dim = z0_dim, n_gru_units = args.gru_units, device = device).to(device)
+
+	decoder = Decoder(args.latents, gen_data_dim).to(device)
+
+	diffeq_solver = DiffeqSolver(gen_data_dim, gen_ode_func, 'dopri5', args.latents, 
+		odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+
+	model = LatentODE(
+		input_dim = gen_data_dim, 
+		latent_dim = args.latents, 
+		encoder_z0 = encoder_z0, 
+		decoder = decoder, 
+		diffeq_solver = diffeq_solver, 
+		z0_prior = z0_prior, 
+		device = device,
+		obsrv_std = obsrv_std,
+		use_poisson_proc = args.poisson, 
+		use_binary_classif = args.classif,
+		linear_classifier = args.linear_classif,
+		classif_per_tp = classif_per_tp,
+		n_labels = n_labels,
+		train_classif_w_reconstr = False
+		).to(device)
+
+	return model
+
+##################################################################
+# Model
+obsrv_std = torch.Tensor([obsrv_std]).to(device)
+z0_prior = Normal(torch.Tensor([0.0]).to(device), torch.Tensor([1.]).to(device))
+
+model = create_LatentODE_model(input_dim, z0_prior, obsrv_std)
 
 ##################################################################
 # Training
@@ -32,12 +111,37 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if __name__ == '__main__':
 
     optimizer = torch.optim.Adamax(model.parameters(), lr=0.01)
-    train_loader = torch.load('tess_train.pt')
+    train_loader = iter(torch.load('tess_train.pt'))
+    test_loader = iter(torch.load('tess_cv.pt')
     num_batches = len(train_loader)
+    kl_wait = 3
+    num_epochs = NUM_EPOCHS
+    best_loss = np.inf
+
+    for epoch in range(num_epochs):
+        kl_coef = (1 - 0.95 ** epoch) if epoch < kl_wait else 0
+        train_loss = 0
+        train_props = {k:0 for k in status_properties}
+        for i, data in train_loader:
+            optimizer.zero_grad()
+            train_res = model.compute_all_losses(data, n_traj_samples=3, kl_coef=kl_coef)
+            train_res['loss'].backward()
+            train_props['loss'] += train_res['loss'].item()
+        train_props = {k:v/len(train_loader) for k,v in train_props.items()}
+        if train_props['loss'] < best_loss:
+            best_loss = train_props['loss']
+            torch.save({
+                'epoch': epoch
+                'loss': loss,
+                'state_dict': model.state_dict(),
+            }
+
+
+        
 
     for itr in range(1, num_batches * (args.niters + 1)):
         optimizer.zero_grad()
-        utils.update_learning_rate(optimizer, decay_rate = 0.999, lowest = args.lr / 10)
+        ode.utils.update_learning_rate(optimizer, decay_rate = 0.999, lowest = args.lr / 10)
 
         wait_until_kl_inc = 10
         if itr // num_batches < wait_until_kl_inc:
@@ -45,7 +149,7 @@ if __name__ == '__main__':
         else:
             kl_coef = (1-0.99** (itr // num_batches - wait_until_kl_inc))
 
-        batch_dict = utils.get_next_batch(train_loader)
+        batch_dict = next(train_loader)
         import pdb; pdb.set_trace()
         train_res = model.compute_all_losses(batch_dict, n_traj_samples = 3, kl_coef = kl_coef)
         train_res["loss"].backward()
@@ -66,50 +170,8 @@ if __name__ == '__main__':
                     itr//num_batches, 
                     test_res["loss"].detach(), test_res["likelihood"].detach(), 
                     test_res["kl_first_p"], test_res["std_first_p"])
-            
-                logger.info("Experiment " + str(experimentID))
-                logger.info(message)
-                logger.info("KL coef: {}".format(kl_coef))
-                logger.info("Train loss (one batch): {}".format(train_res["loss"].detach()))
-                logger.info("Train CE loss (one batch): {}".format(train_res["ce_loss"].detach()))
-                
-                if "auc" in test_res:
-                    logger.info("Classification AUC (TEST): {:.4f}".format(test_res["auc"]))
-
-                if "mse" in test_res:
-                    logger.info("Test MSE: {:.4f}".format(test_res["mse"]))
-
-                if "accuracy" in train_res:
-                    logger.info("Classification accuracy (TRAIN): {:.4f}".format(train_res["accuracy"]))
-
-                if "accuracy" in test_res:
-                    logger.info("Classification accuracy (TEST): {:.4f}".format(test_res["accuracy"]))
-
-                if "pois_likelihood" in test_res:
-                    logger.info("Poisson likelihood: {}".format(test_res["pois_likelihood"]))
-
-                if "ce_loss" in test_res:
-                    logger.info("CE loss: {}".format(test_res["ce_loss"]))
 
             torch.save({
-                'args': args,
+                'loss': loss,
                 'state_dict': model.state_dict(),
-            }, ckpt_path)
-
-
-            # Plotting
-            if args.viz:
-                with torch.no_grad():
-                    test_dict = utils.get_next_batch(data_obj["test_dataloader"])
-
-                    print("plotting....")
-                    if isinstance(model, LatentODE) and (args.dataset == "periodic"): #and not args.classic_rnn and not args.ode_rnn:
-                        plot_id = itr // num_batches // n_iters_to_viz
-                        viz.draw_all_plots_one_dim(test_dict, model, 
-                            plot_name = file_name + "_" + str(experimentID) + "_{:03d}".format(plot_id) + ".png",
-                            experimentID = experimentID, save=True)
-                        plt.pause(0.01)
-    torch.save({
-        'args': args,
-        'state_dict': model.state_dict(),
-    }, ckpt_path)
+            }, 'latent_ode_checkpoint.pth.tar')
