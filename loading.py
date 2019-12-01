@@ -55,8 +55,8 @@ class TessLoaderFactory():
         cv_files = self.files[L:]
         train_ds = TessDataset(train_files)
         cv_ds = TessDataset(cv_files)
-        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ae)
-        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ae)
+        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ar)
+        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ar)
         torch.save(train_loader, 'tess_train.pt')
         torch.save(cv_loader, 'tess_cv.pt')
 
@@ -75,8 +75,20 @@ class TessLoaderFactory():
         ts_interp = torch.cumsum(ts_interp, dim=1)
         return ts, ys, mask, ts_interp
 
-    def collate_ar(self, batch):
-        pass
+    def collate_ar(self, batch, p=0.85):
+        batch = torch.stack(batch)
+        bs = batch.size(0)
+        sl = batch.size(2)
+        ts = batch[:, 0]
+        ys = batch[:, 1]
+        L = int(p*sl)
+        t_train = ts[:, :L]
+        ys_train = ys[:, :L]
+        mask_train = ~torch.isnan(ys_train)
+        t_pred = ts[:, L:]
+        y_pred = ys[:, L:]
+        mask_pred = ~torch.isnan(y_pred)
+        return t_train, ys_train, mask_train, t_pred, y_pred, mask_pred
 
 class VAEDataset(torch.utils.data.Dataset):
     def __init__(self, x):
