@@ -64,8 +64,9 @@ class TessLoaderFactory():
         batch = torch.stack(batch)
         bs = batch.size(0)
         ts = batch[:, 0]
+        ts = ts - ts[:, 0].view(bs, 1)
         ys = batch[:, 1]
-        mask = ~torch.isnan(ys)
+        mask = ~torch.isnan(ys).unsqueeze(-1).float()
         ti = ts[:, 0]
         tf = ts[:, -1]
         dt = (tf - ti)/T
@@ -80,15 +81,26 @@ class TessLoaderFactory():
         bs = batch.size(0)
         sl = batch.size(2)
         ts = batch[:, 0]
+        ts = ts - ts[:,0].view(bs, 1)
+        # ts = ts[0].squeeze() # check
         ys = batch[:, 1]
         L = int(p*sl)
         t_train = ts[:, :L]
-        ys_train = ys[:, :L]
+        ys_train = ys[:, :L].unsqueeze(-1)
         mask_train = ~torch.isnan(ys_train)
+        mask_train = mask_train.float()
         t_pred = ts[:, L:]
-        y_pred = ys[:, L:]
+        y_pred = ys[:, L:].unsqueeze(-1)
         mask_pred = ~torch.isnan(y_pred)
-        return t_train, ys_train, mask_train, t_pred, y_pred, mask_pred
+        mask_pred = mask_pred.float()
+        batch_dict = {'observed_data': ys_train, 
+                      'observed_tp': t_train[0].view(-1), 
+                      'data_to_predict': y_pred, 
+                      'tp_to_predict': t_pred[0].view(-1), 
+                      'observed_mask': mask_train, 
+                      'mask_predicted_data': mask_pred, 
+                      'labels': None, 'mode': 'extrap'}
+        return batch_dict
 
 class VAEDataset(torch.utils.data.Dataset):
     def __init__(self, x):
