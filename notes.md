@@ -46,7 +46,9 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - When to use ode-rnn: standard rnns ignore the time gaps between points, with few missing values, or when time intervals between points are short. In ode-rnns the dynamics between time points is learned.
 - interpolation and extrapolation possible
 - to do extrapolation train on the first half and decode the second half. (so z can be a repr of whole signal or first half, rnn-vae is full signal interpretation)
-- mention dimensionality of input
+- mention dimensionality of input(
+- Reconstruction/interpolation: Show an unseen sample with unevenly sampled data (with transients) and show that the reconstruction captures complexities. Mention how this non linear interpretation is then encoded in the latent state which can then be searched through and compress the signal.
+- 
 
 # Astronomy
 - A Search for Analogs of KIC8462852 A Proof of Concept and First Candidates - https://iopscience.iop.org/article/10.3847/2041-8213/ab2e77
@@ -68,6 +70,11 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Highlighting by minimum normalized flux values we can see that they still end up in different locations on the TSNE diagram, as they have different characteristics. This is the advantage of representing time series in a non-linear way. 
 - Emphasize how you don't have to have query inps that are within the dataset, you can input whatever you want.
 - Gaia data is 200TB - should be possible to handle this with the above methods. We can encode lots of information into any dimension we want to save memory. More dims is more expressive but higher memory (tradeoff).
+
+# ML
+- Can even use the method for spectroscopy. The non-linear way it gets encoded captures different combnations of elements and will cluster phenomena together.
+- Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers.
+- Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public

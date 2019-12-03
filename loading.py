@@ -14,6 +14,7 @@ from utils import pooling
 import torch
 import torch.nn.functional as F
 import os
+from torch.distributions import Bernoulli
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
@@ -57,26 +58,29 @@ class TessLoaderFactory():
         cv_files = self.files[L:]
         train_ds = TessDataset(train_files)
         cv_ds = TessDataset(cv_files)
-        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ar)
-        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ar)
+        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ae)
+        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ae)
         torch.save(train_loader, 'tess_train.pt')
         torch.save(cv_loader, 'tess_cv.pt')
 
-    def collate_ae(self, batch, T=1000):
+    def collate_ae(self, batch, train_p=0.25):
         batch = torch.stack(batch)
         bs = batch.size(0)
+        sl = batch.size(2)
         ts = batch[:, 0]
-        ts = ts - ts[:, 0].view(bs, 1)
-        ys = batch[:, 1]
-        mask = ~torch.isnan(ys).unsqueeze(-1).float()
-        ti = ts[:, 0]
-        tf = ts[:, -1]
-        dt = (tf - ti)/T
-        dt = dt.view(bs, 1)
-        ts_interp = F.pad(dt.unsqueeze(1), (0, T), mode='replicate').squeeze()
-        ts_interp[:, 0] = ti
-        ts_interp = torch.cumsum(ts_interp, dim=1)
-        return ts, ys, mask, ts_interp
+        ys = batch[:, 1].unsqueeze(-1)
+        p = torch.FloatTensor([train_p])
+        mask_train = Bernoulli(p).sample(torch.Size([bs, sl]))
+        y_train = ys * mask_train
+        y_pred = ys
+        batch_dict = {'observed_data': y_train.to(device), 
+                      'observed_tp': ts[0].view(-1).to(device), 
+                      'data_to_predict': y_pred.to(device), 
+                      'tp_to_predict': ts[0].view(-1).to(device), 
+                      'observed_mask': mask_train.to(device), 
+                      'mask_predicted_data': None, 
+                      'labels': None, 'mode': 'interp'}
+        return batch_dict
 
     def collate_ar(self, batch, p=0.85):
         batch = torch.stack(batch)

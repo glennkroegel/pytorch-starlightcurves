@@ -48,7 +48,7 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
 
     dim = latent_dim
     ode_func_net = utils.create_net(dim, latents, 
-        n_layers = 1, n_units = 32, nonlinear = nn.Tanh)
+        n_layers = 2, n_units = 100, nonlinear = nn.Tanh)
 
     gen_ode_func = ODEFunc(
         input_dim = input_dim, 
@@ -64,7 +64,7 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
     z0_dim = latent_dim
 
     ode_func_net = utils.create_net(n_rec_dims, n_rec_dims, 
-        n_layers = 1, n_units = 16, nonlinear = nn.Tanh)
+        n_layers = 2, n_units = 100, nonlinear = nn.Tanh)
 
     rec_ode_func = ODEFunc(
         input_dim = enc_input_dim, 
@@ -76,7 +76,7 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
         odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
 
     encoder_z0 = Encoder_z0_ODE_RNN(n_rec_dims, enc_input_dim, z0_diffeq_solver, 
-        z0_dim = z0_dim, n_gru_units = 32, device = device).to(device)
+        z0_dim = z0_dim, n_gru_units = 100, device = device).to(device)
 
     decoder = Decoder(latents, input_dim=1).to(device)
 
@@ -134,7 +134,7 @@ if __name__ == '__main__':
     num_epochs = NUM_EPOCHS
     best_loss = np.inf
     for epoch in tqdm(range(num_epochs)):
-        kl_coef = (1 - 0.95 ** epoch) if epoch < kl_wait else 0
+        kl_coef = (1 - 0.9 ** epoch) if epoch < kl_wait else 0
         train_loss = 0
         train_props = {k:0 for k in status_properties}
         for i, data in enumerate(train_loader):
