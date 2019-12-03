@@ -18,6 +18,8 @@ from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class TSDataset(torch.utils.data.Dataset):
     def __init__(self, x, y):
         self.x = torch.FloatTensor(x)
@@ -93,12 +95,12 @@ class TessLoaderFactory():
         y_pred = ys[:, L:].unsqueeze(-1)
         mask_pred = ~torch.isnan(y_pred)
         mask_pred = mask_pred.float()
-        batch_dict = {'observed_data': ys_train, 
-                      'observed_tp': t_train[0].view(-1), 
-                      'data_to_predict': y_pred, 
-                      'tp_to_predict': t_pred[0].view(-1), 
-                      'observed_mask': mask_train, 
-                      'mask_predicted_data': mask_pred, 
+        batch_dict = {'observed_data': ys_train.to(device), 
+                      'observed_tp': t_train[0].view(-1).to(device), 
+                      'data_to_predict': y_pred.to(device), 
+                      'tp_to_predict': t_pred[0].view(-1).to(device), 
+                      'observed_mask': mask_train.to(device), 
+                      'mask_predicted_data': mask_pred.to(device), 
                       'labels': None, 'mode': 'extrap'}
         return batch_dict
 

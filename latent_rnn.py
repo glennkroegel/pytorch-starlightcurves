@@ -19,7 +19,6 @@ import numpy as np
 from collections import defaultdict, Counter
 
 import torch
-from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data_utils
@@ -128,8 +127,8 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
 
     optimizer = torch.optim.Adamax(model.parameters(), lr=0.01)
-    train_loader = iter(torch.load('tess_train.pt'))
-    test_loader = iter(torch.load('tess_cv.pt'))
+    train_loader = torch.load('tess_train.pt')
+    test_loader = torch.load('tess_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 3
     num_epochs = NUM_EPOCHS
@@ -143,6 +142,7 @@ if __name__ == '__main__':
             train_res = model.compute_all_losses(data, n_traj_samples=3, kl_coef=kl_coef)
             train_res['loss'].backward()
             train_props['loss'] += train_res['loss'].item()
+            optimizer.step()
         train_props = {k:v/len(train_loader) for k,v in train_props.items()}
         loss = train_props['loss']
         status(epoch, train_props)
