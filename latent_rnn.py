@@ -40,7 +40,7 @@ n_labels = 1
 obsrv_std = 0.01
 niters = 1
 status_properties = ['loss']
-latent_dim = 10
+latent_dim = 30
 
 ##################################################################
 
@@ -57,7 +57,7 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
         device = device).to(device)
         
     z0_diffeq_solver = None
-    n_rec_dims = 20 # rec_dims: default 20
+    n_rec_dims = 50 # rec_dims: default 20
     enc_input_dim = int(input_dim) * 2 # we concatenate the mask
     gen_data_dim = input_dim
 
@@ -125,8 +125,9 @@ def status(epoch, train_props, cv_props=None):
         print(s0 + s1)
 
 if __name__ == '__main__':
-
-    optimizer = torch.optim.Adamax(model.parameters(), lr=0.01)
+    
+    print(model)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=0.001)
     train_loader = torch.load('tess_train.pt')
     test_loader = torch.load('tess_cv.pt')
     num_batches = len(train_loader)
