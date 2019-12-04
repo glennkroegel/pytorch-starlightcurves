@@ -48,7 +48,7 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - to do extrapolation train on the first half and decode the second half. (so z can be a repr of whole signal or first half, rnn-vae is full signal interpretation)
 - mention dimensionality of input(
 - Reconstruction/interpolation: Show an unseen sample with unevenly sampled data (with transients) and show that the reconstruction captures complexities. Mention how this non linear interpretation is then encoded in the latent state which can then be searched through and compress the signal.
-- 
+- Probably should demonstrate interpolation within sampled data
 
 # Astronomy
 - A Search for Analogs of KIC8462852 A Proof of Concept and First Candidates - https://iopscience.iop.org/article/10.3847/2041-8213/ab2e77
@@ -75,11 +75,13 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Can even use the method for spectroscopy. The non-linear way it gets encoded captures different combnations of elements and will cluster phenomena together.
 - Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers.
 - Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
+- At a crossroads where RNNs are being used less in favor of CNNs with attention and positional encodings. This is what is used in state of the art NLP models in the form of the transformer architecture.
+- Unevenly spaced, show gaps in measurements
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public
 - https://datahub.io/machine-learning/spectrometer : infrared - part of IRAS low resolution Spectrometer Database Source 
-- Gaia (used in search for analogs paper) - http://gea.esac.esa.int/archive/ - ts data has no ra or dec info
+- Gaia (used in search for analogs paper) - http://cdn.gea.esac.esa.int/Gaia/gdr1/gaia_source/csv/ - ts data has no ra or dec info
 - Tess (basis of planet hunters) - https://archive.stsci.edu/tess/bulk_downloads.html
 - National Radio Observatory - https://archive.nrao.edu/archive/advquery.jsp
 - https://exoplanetarchive.ipac.caltech.edu/cgi-bin/ICETimeSeriesViewer

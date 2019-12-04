@@ -34,14 +34,60 @@ class TSDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.x)
 
+class GaiaDataset(torch.utils.data.Dataset):
+    def __init__(self, data):
+        self.data = data
+        self.sources = list(data.keys())
+
+    def __getitem__(self, i):
+        source = self.sources[i]
+        data = self.data[source]
+        data = torch.FloatTensor(data)
+        data.transpose_(0,1)
+        return source, data
+
+    def __len__(self):
+        return len(self.sources)
+
+class GaiaLoaderFactory():
+    '''Load Gaia time series data'''
+    def __init__(self):
+        self.path = 'gaia/'
+        self.file = 'joined.csv'
+
+    def generate(self, batch_size=1, train_size=0.9):
+        df = pd.read_csv(os.path.join(self.path, self.file))
+        sources = df['source_id'].unique()
+        df = df.loc[df['band'] == 'G']
+        df.drop('band', axis=1, inplace=True)
+        df['time'] = df['time'].astype(np.float32)
+        import pdb; pdb.set_trace()
+        df = df.groupby('source_id')[['time','flux_over_error']].apply(lambda x: list(x.values.astype(np.float32)))
+        data_dict = df.to_dict()
+        L = int(train_size*len(sources))
+        train_srcs = sources[:L]
+        cv_srcs = sources[L:]
+        train_data = {k:np.stack(v) for k,v in data_dict.items() if k in train_srcs}
+        cv_data = {k:np.stack(v) for k,v in data_dict.items() if k in cv_srcs}
+        train_ds = GaiaDataset(train_data)
+        cv_ds = GaiaDataset(cv_data)
+        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ae)
+        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ae)
+        torch.save(train_loader, 'gaia_train.pt')
+        torch.save(cv_loader, 'gaia_cv.pt')
+
+    def collate_ae(self, batch):
+        return batch
+
 class TessDataset(torch.utils.data.Dataset):
     def __init__(self, files):
         self.files = files
 
     def __getitem__(self, i):
+        filename = self.files[i]
         data = np.load(self.files[i]).astype(np.float32)
         data = torch.FloatTensor(data)
-        return data
+        return filename, data
 
     def __len__(self):
         return len(self.files)
@@ -52,7 +98,7 @@ class TessLoaderFactory():
         self.path = 'tess/processed'
         self.files = glob.glob(os.path.join(self.path, '*.npy'))
 
-    def generate(self, batch_size=4, train_size=0.9):
+    def generate(self, batch_size=1, train_size=0.9):
         L = int(train_size*len(self.files))
         train_files = self.files[:L]
         cv_files = self.files[L:]
@@ -63,7 +109,8 @@ class TessLoaderFactory():
         torch.save(train_loader, 'tess_train.pt')
         torch.save(cv_loader, 'tess_cv.pt')
 
-    def collate_ae(self, batch, train_p=0.25):
+    def collate_ae(self, data, train_p=0.75):
+        fname, batch = data
         batch = torch.stack(batch)
         bs = batch.size(0)
         sl = batch.size(2)

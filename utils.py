@@ -15,6 +15,22 @@ def one_hot(labels, num_classes):
     y = y[labels]
     return y
 
+def increase_resolution(batch, T=1000):
+    batch = torch.stack(batch)
+    bs = batch.size(0)
+    ts = batch[:, 0]
+    ts = ts - ts[:, 0].view(bs, 1)
+    ys = batch[:, 1]
+    mask = ~torch.isnan(ys).unsqueeze(-1).float()
+    ti = ts[:, 0]
+    tf = ts[:, -1]
+    dt = (tf - ti)/T
+    dt = dt.view(bs, 1)
+    ts_interp = F.pad(dt.unsqueeze(1), (0, T), mode='replicate').squeeze()
+    ts_interp[:, 0] = ti
+    ts_interp = torch.cumsum(ts_interp, dim=1)
+    return ts, ys, mask, ts_interp
+
 def accuracy_from_logits(input, targs):
     "Compute accuracy with `targs` when `input` is bs * n_classes."
     n = targs.shape[0]
