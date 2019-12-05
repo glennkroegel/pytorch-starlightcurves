@@ -8,6 +8,7 @@ description: Create dataloaders to feed for training
 import pandas as pd
 import numpy as np
 import glob
+import random
 from config import TRAIN_DATA, CV_DATA
 from utils import pooling
 
@@ -55,14 +56,19 @@ class GaiaLoaderFactory():
         self.path = 'gaia/'
         self.file = 'joined.csv'
 
-    def generate(self, batch_size=1, train_size=0.9):
+    def generate(self, batch_size=1, num_samples=100, train_size=0.9):
         df = pd.read_csv(os.path.join(self.path, self.file))
-        sources = df['source_id'].unique()
+        sources = list(df['source_id'].unique())
+        sources = random.sample(sources, num_samples)
+        df = df.loc[df['source_id'].isin(sources)]
         df = df.loc[df['band'] == 'G']
+        df = df.loc[~(df['rejected_by_photometry'] | df['rejected_by_variability'])]
         df.drop('band', axis=1, inplace=True)
         df['time'] = df['time'].astype(np.float32)
-        import pdb; pdb.set_trace()
-        df = df.groupby('source_id')[['time','flux_over_error']].apply(lambda x: list(x.values.astype(np.float32)))
+        # df = df.groupby(['source_id','time'])['flux_over_error'].mean()
+        # df['scaled'] = df.groupby('source_id')['flux_over_error'].apply(lambda x: x/x.max())
+        df['scaled'] = df.groupby('source_id')['mag'].apply(lambda x: x/x.max())
+        df = df.groupby('source_id')[['time','scaled']].apply(lambda x: sorted(list(x.values.astype(np.float32)), key=lambda x: x[0]))
         data_dict = df.to_dict()
         L = int(train_size*len(sources))
         train_srcs = sources[:L]
@@ -76,8 +82,27 @@ class GaiaLoaderFactory():
         torch.save(train_loader, 'gaia_train.pt')
         torch.save(cv_loader, 'gaia_cv.pt')
 
-    def collate_ae(self, batch):
-        return batch
+    def collate_ae(self, data, train_p=0.75):
+        fname, batch = data[0]
+        # batch = torch.stack(batch)
+        if len(batch.size()) < 3:
+            batch = batch.unsqueeze(0)
+        bs = batch.size(0)
+        sl = batch.size(2)
+        ts = batch[:, 0]
+        ys = batch[:, 1].unsqueeze(-1)
+        p = torch.FloatTensor([train_p])
+        mask_train = Bernoulli(p).sample(torch.Size([bs, sl]))
+        y_train = ys * mask_train
+        y_pred = ys
+        batch_dict = {'observed_data': y_train.to(device), 
+                      'observed_tp': ts[0].view(-1).to(device), 
+                      'data_to_predict': y_pred.to(device), 
+                      'tp_to_predict': ts[0].view(-1).to(device), 
+                      'observed_mask': mask_train.to(device), 
+                      'mask_predicted_data': None, 
+                      'labels': None, 'mode': 'interp'}
+        return batch_dict
 
 class TessDataset(torch.utils.data.Dataset):
     def __init__(self, files):
@@ -201,7 +226,7 @@ class BalancedDataLoaderFactory():
     def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
         pass
 
-    def gen_loaders(self, n_samples=2000, test_size=0.2, batch_size=200, pool=8):
+    def gen_loaders(self, n_samples=2000, test_size=0.2, batch_size=200, pool=8, latent=True):
         train_data = pd.read_csv(TRAIN_DATA, delimiter='\t', header=None)
         cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
         df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)
@@ -226,15 +251,24 @@ class BalancedDataLoaderFactory():
             cv_data = pooling(cv_data, (1,pool))
         train_set = TSDataset(train_data, train_y)
         cv_set = TSDataset(cv_data, cv_y)
-        train_loader = DataLoader(train_set, batch_size=batch_size, drop_last=True)
-        cv_loader = DataLoader(cv_set, batch_size=batch_size, drop_last=True)
-        torch.save(train_loader, 'train_loader.pt')
-        torch.save(cv_loader, 'cv_loader.pt')
+        if latent:
+            train_loader = DataLoader(train_set, batch_size=batch_size, drop_last=True, collate_fn=self.collate_ae, shuffle=False)
+            cv_loader = DataLoader(cv_set, batch_size=batch_size, drop_last=True, collate_fn=self.collate_ae, shuffle=False)
+            torch.save(train_loader, 'ucr_train.pt')
+            torch.save(cv_loader, 'ucr_cv.pt')
+        else:
+            train_loader = DataLoader(train_set, batch_size=batch_size, drop_last=True)
+            cv_loader = DataLoader(cv_set, batch_size=batch_size, drop_last=True)
+            torch.save(train_loader, 'train_loader.pt')
+            torch.save(cv_loader, 'cv_loader.pt')
 
     def collate_fn(self, batch):
         xs = torch.stack([x[0] for x in batch])
         ys = torch.stack([x[1] for x in batch])
         return xs, ys
+
+    def collate_ae(self):
+        pass
 
     def save_loaders(self):
         torch.save(self.train_loader, 'train_loader.pt')

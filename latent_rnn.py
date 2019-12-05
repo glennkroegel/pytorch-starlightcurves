@@ -127,9 +127,9 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=0.001)
-    train_loader = torch.load('tess_train.pt')
-    test_loader = torch.load('tess_cv.pt')
+    optimizer = torch.optim.Adamax(model.parameters(), lr=0.01)
+    train_loader = torch.load('gaia_train.pt')
+    test_loader = torch.load('gaia_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 3
     num_epochs = NUM_EPOCHS
@@ -139,6 +139,8 @@ if __name__ == '__main__':
         train_loss = 0
         train_props = {k:0 for k in status_properties}
         for i, data in enumerate(train_loader):
+            if i % 20 == 0:
+                print(i)
             optimizer.zero_grad()
             train_res = model.compute_all_losses(data, n_traj_samples=3, kl_coef=kl_coef)
             train_res['loss'].backward()

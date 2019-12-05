@@ -50,6 +50,14 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Reconstruction/interpolation: Show an unseen sample with unevenly sampled data (with transients) and show that the reconstruction captures complexities. Mention how this non linear interpretation is then encoded in the latent state which can then be searched through and compress the signal.
 - Probably should demonstrate interpolation within sampled data
 
+# Gaia
+- One billion stars in our galaxy
+- Solar system - asteroids, trojan companions, kuiper belt objects and centaurs.
+- Near earth objects - 1600 potentially hazardous asteroids >1km within 1 AU.
+- Light bending (subtracted the sun)
+- Blue photometer (330-680nm)
+- Red photometer (640-1050nm) 
+
 # Astronomy
 - A Search for Analogs of KIC8462852 A Proof of Concept and First Candidates - https://iopscience.iop.org/article/10.3847/2041-8213/ab2e77
 - https://www.skyandtelescope.com/astronomy-news/are-there-more-stars-like-boyajians-star/
