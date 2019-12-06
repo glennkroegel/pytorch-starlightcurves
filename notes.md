@@ -16,6 +16,10 @@ more  good text - https://pyro.ai/examples/dmm.html
 https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-good-uncertainty-measure-for-deep-learning-models - The issue with many deep neural networks is that, although they tend to perform well for prediction, their estimated predicted probabilities produced by the output of a softmax layer can not reliably be used as the true probabilities (as a confidence for each label). In practice, they tend to be too high - neural networks are 'too confident' in their predictions. 
 - Variational bayes and the local reparameterization trick: We explore an as yet unexploited opportunity for drastically improving the efficiency of stochastic gradient variational Bayes (SGVB) with global model parameters. Regular SGVB estimators rely on sampling of parameters once per minibatch of data, and have variance that is constant w.r.t. the minibatch size. The efficiency of such estimators can be drastically improved upon by translating uncertainty about global parameters into local noise that is independent across datapoints in the minibatch
 - Annealing: to make training easier we make
+- https://towardsdatascience.com/a-gentle-introduction-to-probabilistic-programming-languages-ba9105d9cbce
+- https://towardsdatascience.com/bayesian-deep-learning-with-fastai-how-not-to-be-uncertain-about-your-uncertainty-6a99d1aa686e
+- https://github.com/sungyubkim/MCDO/blob/master/Bayesian_CNN_with_MCDO.ipynb
+- Softmax has a tendency to squeeze everything
 
 # VAE
 - The latent variable z describes local structure of each data point.
@@ -69,6 +73,7 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - We know Tabby's star is not aliens because it absorbs specific frequencies in infrared, meaning it is not opaque.
 
 # Similarity search
+- Vectors that are similar to a query vector are those that have the lowest L2 distance or the highest dot product with the query vector. It also supports cosine similarity, since this is a dot product on normalized vectors.
 - Reference Billion Scale Similarity Search
 - Curse of dimensionality
 - Approximate methods are used to handle the complexity - but tend to break down for high dimensions.
@@ -78,6 +83,7 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Highlighting by minimum normalized flux values we can see that they still end up in different locations on the TSNE diagram, as they have different characteristics. This is the advantage of representing time series in a non-linear way. 
 - Emphasize how you don't have to have query inps that are within the dataset, you can input whatever you want.
 - Gaia data is 200TB - should be possible to handle this with the above methods. We can encode lots of information into any dimension we want to save memory. More dims is more expressive but higher memory (tradeoff).
+- Multiple input and output results in the same output vector, which can be added to the db. The query vector will then be the output of the neural network that took in these multiple inputs.
 
 # ML
 - Can even use the method for spectroscopy. The non-linear way it gets encoded captures different combnations of elements and will cluster phenomena together.
@@ -85,6 +91,7 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
 - At a crossroads where RNNs are being used less in favor of CNNs with attention and positional encodings. This is what is used in state of the art NLP models in the form of the transformer architecture.
 - Unevenly spaced, show gaps in measurements
+- Explain and demonstrate: Interpolation, extrapolation, concept of latent state instead of just prediction (inc. compression effect), concept of similarity, concept of search, simulate inputs then getting state and searching db with this, concept of query within db to find strange objects.
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public

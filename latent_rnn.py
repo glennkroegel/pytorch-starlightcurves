@@ -128,8 +128,8 @@ if __name__ == '__main__':
     
     print(model)
     optimizer = torch.optim.Adamax(model.parameters(), lr=0.01)
-    train_loader = torch.load('gaia_train.pt')
-    test_loader = torch.load('gaia_cv.pt')
+    train_loader = torch.load('vae_train_loader.pt')
+    test_loader = torch.load('vae_cv_loader.pt')
     num_batches = len(train_loader)
     kl_wait = 3
     num_epochs = NUM_EPOCHS

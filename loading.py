@@ -280,7 +280,7 @@ class VAEDataLoaderFactory():
     def __init__(self, train_path=TRAIN_DATA, cv_path=CV_DATA):
         pass
 
-    def gen_loaders(self, n_samples=3000, test_size=0.1, batch_size=50, pool=8):
+    def gen_loaders(self, n_samples=500, test_size=0.1, batch_size=50, pool=8, latent=True):
         train_data = pd.read_csv(TRAIN_DATA, delimiter='\t', header=None)
         cv_data = pd.read_csv(CV_DATA, delimiter='\t', header=None)
         df = pd.concat([train_data, cv_data], axis=0, ignore_index=True)
@@ -294,8 +294,34 @@ class VAEDataLoaderFactory():
             cv_data = pooling(cv_data, (1,pool))
         train_set = VAEDataset(train_data)
         cv_set = VAEDataset(cv_data)
-        train_loader = DataLoader(train_set, batch_size=batch_size)
-        cv_loader = DataLoader(cv_set, batch_size=batch_size)
+        if latent:
+            train_loader = DataLoader(train_set, batch_size=batch_size, collate_fn=self.collate_ae, shuffle=False)
+            cv_loader = DataLoader(cv_set, batch_size=batch_size, collate_fn=self.collate_ae, shuffle=False)
+        else:
+            train_loader = DataLoader(train_set, batch_size=batch_size)
+            cv_loader = DataLoader(cv_set, batch_size=batch_size)
         torch.save(train_loader, 'vae_train_loader.pt')
         torch.save(cv_loader, 'vae_cv_loader.pt')
+
+    def collate_ae(self, batch, train_p=0.75):
+        batch = torch.stack(batch)
+        bs = batch.size(0)
+        sl = batch.size(1)
+        ys = batch.unsqueeze(-1)
+        dt = 1/sl
+        dts = F.pad(torch.FloatTensor([dt]).view(1,1,-1), pad=(0, sl-1), mode='replicate').squeeze()
+        ts = torch.cumsum(dts, dim=0)
+        mask_train = torch.ones(len(ts)).repeat(bs, 1).unsqueeze(-1)
+        # p = torch.FloatTensor([train_p])
+        # mask_train = Bernoulli(p).sample(torch.Size([bs, sl])) # check whether this screws results
+        y_train = ys * mask_train
+        y_pred = ys
+        batch_dict = {'observed_data': y_train.to(device), 
+                      'observed_tp': ts.view(-1).to(device), 
+                      'data_to_predict': y_pred.to(device), 
+                      'tp_to_predict': ts.view(-1).to(device), 
+                      'observed_mask': mask_train.to(device), 
+                      'mask_predicted_data': None, 
+                      'labels': None, 'mode': 'interp'}
+        return batch_dict
 
