@@ -63,6 +63,7 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Red photometer (640-1050nm) 
 
 # Astronomy
+- Explain flux over error and MJD
 - A Search for Analogs of KIC8462852 A Proof of Concept and First Candidates - https://iopscience.iop.org/article/10.3847/2041-8213/ab2e77
 - https://www.skyandtelescope.com/astronomy-news/are-there-more-stars-like-boyajians-star/
 - Lots of stellar properties we can input into models (e.g. https://exoplanetarchive.ipac.caltech.edu/cgi-bin/)
@@ -71,6 +72,7 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Example between BP and RP correlating and observing, and how we can encode ts info and characteristics as encoding and cluster them.
 - Can do joint optical and infrared as well like Keck
 - We know Tabby's star is not aliens because it absorbs specific frequencies in infrared, meaning it is not opaque.
+
 
 # Similarity search
 - Vectors that are similar to a query vector are those that have the lowest L2 distance or the highest dot product with the query vector. It also supports cosine similarity, since this is a dot product on normalized vectors.

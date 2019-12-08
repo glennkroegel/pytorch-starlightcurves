@@ -56,7 +56,7 @@ class GaiaLoaderFactory():
         self.path = 'gaia/'
         self.file = 'joined.csv'
 
-    def generate(self, batch_size=1, num_samples=100, train_size=0.9):
+    def generate(self, batch_size=10, num_samples=100, train_size=0.9):
         df = pd.read_csv(os.path.join(self.path, self.file))
         sources = list(df['source_id'].unique())
         sources = random.sample(sources, num_samples)
@@ -65,10 +65,16 @@ class GaiaLoaderFactory():
         df = df.loc[~(df['rejected_by_photometry'] | df['rejected_by_variability'])]
         df.drop('band', axis=1, inplace=True)
         df['time'] = df['time'].astype(np.float32)
+        df = df[df['time']>2200]
+        df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
         # df = df.groupby(['source_id','time'])['flux_over_error'].mean()
         # df['scaled'] = df.groupby('source_id')['flux_over_error'].apply(lambda x: x/x.max())
-        df['scaled'] = df.groupby('source_id')['mag'].apply(lambda x: x/x.max())
-        df = df.groupby('source_id')[['time','scaled']].apply(lambda x: sorted(list(x.values.astype(np.float32)), key=lambda x: x[0]))
+        df['scaled'] = df.groupby('source_id')['flux_over_error'].transform(lambda x: x/x.max())
+        df = df.groupby(['source_id','time_resampled'])['scaled'].mean()
+        df = df.unstack(1).fillna(0).stack()
+        df.name = 'scaled'
+        df = df.reset_index().groupby('source_id')[['time_resampled','scaled']].apply(lambda x: sorted(list(x.values.astype(np.float32)), key=lambda x: x[0]))
+        # df = df.groupby('source_id')[['time','scaled']].apply(lambda x: sorted(list(x.values.astype(np.float32)), key=lambda x: x[0]))
         data_dict = df.to_dict()
         L = int(train_size*len(sources))
         train_srcs = sources[:L]
@@ -83,8 +89,12 @@ class GaiaLoaderFactory():
         torch.save(cv_loader, 'gaia_cv.pt')
 
     def collate_ae(self, data, train_p=0.75):
-        fname, batch = data[0]
-        # batch = torch.stack(batch)
+        fname = []
+        batch = []
+        for i in data:
+            fname.append(i[0])
+            batch.append(i[1])
+        batch = torch.stack(batch)
         if len(batch.size()) < 3:
             batch = batch.unsqueeze(0)
         bs = batch.size(0)
@@ -92,7 +102,8 @@ class GaiaLoaderFactory():
         ts = batch[:, 0]
         ys = batch[:, 1].unsqueeze(-1)
         p = torch.FloatTensor([train_p])
-        mask_train = Bernoulli(p).sample(torch.Size([bs, sl]))
+        # mask_train = Bernoulli(p).sample(torch.Size([bs, sl]))
+        mask_train = (ys != 0).float()
         y_train = ys * mask_train
         y_pred = ys
         batch_dict = {'observed_data': y_train.to(device), 
@@ -100,8 +111,8 @@ class GaiaLoaderFactory():
                       'data_to_predict': y_pred.to(device), 
                       'tp_to_predict': ts[0].view(-1).to(device), 
                       'observed_mask': mask_train.to(device), 
-                      'mask_predicted_data': None, 
-                      'labels': None, 'mode': 'interp'}
+                      'mask_predicted_data': mask_train.to(device), 
+                      'labels': None, 'mode': 'interp', 'sources': fname}
         return batch_dict
 
 class TessDataset(torch.utils.data.Dataset):
