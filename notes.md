@@ -60,7 +60,8 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Near earth objects - 1600 potentially hazardous asteroids >1km within 1 AU.
 - Light bending (subtracted the sun)
 - Blue photometer (330-680nm)
-- Red photometer (640-1050nm) 
+- Red photometer (640-1050nm)
+- I resampled the data and aggregated by mean. Number of samples per object follows a distribution, even within measurement windows.
 
 # Astronomy
 - Explain flux over error and MJD

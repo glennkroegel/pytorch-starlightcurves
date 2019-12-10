@@ -65,7 +65,7 @@ class GaiaLoaderFactory():
         df = df.loc[~(df['rejected_by_photometry'] | df['rejected_by_variability'])]
         df.drop('band', axis=1, inplace=True)
         df['time'] = df['time'].astype(np.float32)
-        df = df[df['time']>2200]
+        df = df[(df['time']>2210) & (df['time']<2222)]
         df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
         # df = df.groupby(['source_id','time'])['flux_over_error'].mean()
         # df['scaled'] = df.groupby('source_id')['flux_over_error'].apply(lambda x: x/x.max())
@@ -84,8 +84,8 @@ class GaiaLoaderFactory():
         cv_data = {k:np.stack(v) for k,v in data_dict.items() if k in cv_srcs}
         train_ds = GaiaDataset(train_data)
         cv_ds = GaiaDataset(cv_data)
-        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ae)
-        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ae)
+        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ae, drop_last=True)
+        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ae, drop_last=True)
         torch.save(train_loader, 'gaia_train.pt')
         torch.save(cv_loader, 'gaia_cv.pt')
 
