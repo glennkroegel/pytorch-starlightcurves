@@ -127,7 +127,7 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=0.003)
     # train_loader = torch.load('vae_train_loader.pt')
     # test_loader = torch.load('vae_cv_loader.pt')
     train_loader = torch.load('gaia_train.pt')

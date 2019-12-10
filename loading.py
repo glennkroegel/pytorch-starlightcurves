@@ -56,7 +56,7 @@ class GaiaLoaderFactory():
         self.path = 'gaia/'
         self.file = 'joined.csv'
 
-    def generate(self, batch_size=10, num_samples=100, train_size=0.9):
+    def generate(self, batch_size=50, num_samples=1000, train_size=0.9):
         df = pd.read_csv(os.path.join(self.path, self.file))
         sources = list(df['source_id'].unique())
         sources = random.sample(sources, num_samples)
@@ -69,7 +69,8 @@ class GaiaLoaderFactory():
         df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
         # df = df.groupby(['source_id','time'])['flux_over_error'].mean()
         # df['scaled'] = df.groupby('source_id')['flux_over_error'].apply(lambda x: x/x.max())
-        df['scaled'] = df.groupby('source_id')['flux_over_error'].transform(lambda x: x/x.max())
+        # df['scaled'] = df.groupby('source_id')['flux_over_error'].transform(lambda x: x/x.max())
+        df['scaled'] = df.groupby('source_id')['flux_over_error'].transform(lambda x: (x-x.mean())/x.std())
         df = df.groupby(['source_id','time_resampled'])['scaled'].mean()
         df = df.unstack(1).fillna(0).stack()
         df.name = 'scaled'
