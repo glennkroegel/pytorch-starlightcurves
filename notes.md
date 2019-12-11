@@ -33,11 +33,22 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Show heatmap of classes and then when doing tsne show middles and fringes of clusters
 - aside: norm of h (can maybe use for pword guessing)
 
+# Uneven time
+- Show plot like fig 9
+
 # ODE
-- Measurements often have disontinuities 
+- Measurements often have disontinuities
+- Latent ODEs can often reconstruct trajectories reasonably well given
+a small subset of points, and provide an estimate of uncertainty over both the latent trajectories and
+predicted observations.
 - We can train a deep neural ODE to address this
 - Variational AE framework
 - A variable length sequence with one or multiple inputs is encoded into a fixed vector representation - this is how the network sematically understands the input
+- Taking the union of time points does not substantially hurt the runtime of the ODE solver, as the
+adaptive time stepping in ODE solvers is not sensitive to the number of time points (t 1 ...t N ) at which
+the solver outputs the state. Instead, it depends on the length on the time interval [t 1 , t N ] and the
+complexity of the dynamics.
+- I did however round up the time points to increase training speed but this didn't result in different looking dynamics or data loss.
 - This representation can be understood as a point in space, with closer points being more similar (lat/long) - but in a higher dimensional - tsne to visualize
 - At the same time, we train a decoder to output a fixed dimension time series which will fill in the spaces.
 - This latent variable framework comes with several benefits: First, it explicitly decouples the dynamics
@@ -76,6 +87,7 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 
 
 # Similarity search
+
 - Vectors that are similar to a query vector are those that have the lowest L2 distance or the highest dot product with the query vector. It also supports cosine similarity, since this is a dot product on normalized vectors.
 - Reference Billion Scale Similarity Search
 - Curse of dimensionality
@@ -89,12 +101,14 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - Multiple input and output results in the same output vector, which can be added to the db. The query vector will then be the output of the neural network that took in these multiple inputs.
 
 # ML
+- Stress that ML is more than just classification
 - Can even use the method for spectroscopy. The non-linear way it gets encoded captures different combnations of elements and will cluster phenomena together.
 - Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers.
 - Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
 - At a crossroads where RNNs are being used less in favor of CNNs with attention and positional encodings. This is what is used in state of the art NLP models in the form of the transformer architecture.
 - Unevenly spaced, show gaps in measurements
 - Explain and demonstrate: Interpolation, extrapolation, concept of latent state instead of just prediction (inc. compression effect), concept of similarity, concept of search, simulate inputs then getting state and searching db with this, concept of query within db to find strange objects.
+- Batching in non-homogenous time series - get the union and batch on intersection?
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public

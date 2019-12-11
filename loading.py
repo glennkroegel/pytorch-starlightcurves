@@ -10,7 +10,7 @@ import numpy as np
 import glob
 import random
 from config import TRAIN_DATA, CV_DATA
-from utils import pooling
+from utils import pooling, batchify
 
 import torch
 import torch.nn.functional as F
@@ -21,6 +21,17 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class ToyDataset(torch.utils.data.Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __getitem__(self, i):
+        x = self.data[i]
+        return x
+    
+    def __len__(self):
+        return len(self.data)
 
 class TSDataset(torch.utils.data.Dataset):
     def __init__(self, x, y):
@@ -102,7 +113,7 @@ class GaiaLoaderFactory():
         sl = batch.size(2)
         ts = batch[:, 0]
         ys = batch[:, 1].unsqueeze(-1)
-        p = torch.FloatTensor([train_p])
+        # p = torch.FloatTensor([train_p])
         # mask_train = Bernoulli(p).sample(torch.Size([bs, sl]))
         mask_train = (ys != 0).float()
         y_train = ys * mask_train
@@ -113,7 +124,11 @@ class GaiaLoaderFactory():
                       'tp_to_predict': ts[0].view(-1).to(device), 
                       'observed_mask': mask_train.to(device), 
                       'mask_predicted_data': mask_train.to(device), 
-                      'labels': None, 'mode': 'interp', 'sources': fname}
+                      'labels': None, 
+                      'mode': 'interp', 
+                      'labels': None,
+                      'sources': fname}
+        batch_dict = batchify(batch_dict)
         return batch_dict
 
 class TessDataset(torch.utils.data.Dataset):

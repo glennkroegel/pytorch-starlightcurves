@@ -130,28 +130,13 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adamax(model.parameters(), lr=0.003)
     # train_loader = torch.load('vae_train_loader.pt')
     # test_loader = torch.load('vae_cv_loader.pt')
-    train_loader = torch.load('gaia_train.pt')
-    test_loader = torch.load('gaia_cv.pt')
+    train_loader = torch.load('toy_train.pt')
+    test_loader = torch.load('toy_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 1
     num_epochs = NUM_EPOCHS
     best_loss = np.inf
-    '''
-    for itr in range(1, num_batches * (args.niters + 1)):
-		optimizer.zero_grad()
-		utils.update_learning_rate(optimizer, decay_rate = 0.999, lowest = args.lr / 10)
 
-		wait_until_kl_inc = 10
-		if itr // num_batches < wait_until_kl_inc:
-			kl_coef = 0.
-		else:
-			kl_coef = (1-0.99** (itr // num_batches - wait_until_kl_inc))
-
-		batch_dict = utils.get_next_batch(data_obj["train_dataloader"])
-		train_res = model.compute_all_losses(batch_dict, n_traj_samples = 3, kl_coef = kl_coef)
-		train_res["loss"].backward()
-		optimizer.step()
-    '''
     for epoch in tqdm(range(num_epochs)):
         kl_coef = (1 - 0.9 ** epoch) if epoch > kl_wait else 0
         print(kl_coef)
@@ -163,7 +148,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             train_res = model.compute_all_losses(data, n_traj_samples=20, kl_coef=kl_coef)
             train_res['loss'].backward()
-            train_props['loss'] += train_res['loss'].item()
+            train_props['loss'] += train_res['loss'].detach().item()
             optimizer.step()
         train_props = {k:v/len(train_loader) for k,v in train_props.items()}
         loss = train_props['loss']
