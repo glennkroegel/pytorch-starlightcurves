@@ -17,25 +17,20 @@ def one_hot(labels, num_classes):
     return y
 
 def collate_ts(data, device=torch.device('cpu')):
-        # batch = []
-        # for i in data:
-        #     batch.append(i[1])
         batch = torch.stack(data)
-        # if len(batch.size()) < 3:
-        #     batch = batch.unsqueeze(0)
         bs = batch.size(0)
         sl = batch.size(2)
         ts = batch[:, 0]
-        ys = batch[:, 1].unsqueeze(-1)
-        mask_train = (ys != 0).float()
-        y_train = ys * mask_train
-        y_pred = ys
-        batch_dict = {'observed_data': y_train.to(device), 
+        y_obs = batch[:, 1].unsqueeze(-1)
+        y_truth = batch[:, 2].unsqueeze(-1)
+        mask_train = (y_obs != 0).float()
+        y_obs = y_obs * mask_train
+        batch_dict = {'observed_data': y_obs.to(device), 
                       'observed_tp': ts[0].view(-1).to(device), 
-                      'data_to_predict': y_pred.to(device), 
+                      'data_to_predict': y_truth.to(device), 
                       'tp_to_predict': ts[0].view(-1).to(device), 
                       'observed_mask': mask_train.to(device), 
-                      'mask_predicted_data': mask_train.to(device), 
+                      'mask_predicted_data': None, 
                       'labels': None, 
                       'mode': 'interp', 
                       'labels': None}
@@ -44,7 +39,7 @@ def collate_ts(data, device=torch.device('cpu')):
 
 def batchify(data_dict):
     # Make the union of all time points and perform normalization across the whole dataset
-    batch_dict = defaultdict(None)
+    batch_dict = {k:None for k in data_dict.keys()}
 
     # remove the time points where there are no observations in this batch
     non_missing_tp = torch.sum(data_dict["observed_data"],(0,2)) != 0.

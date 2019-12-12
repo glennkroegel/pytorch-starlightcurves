@@ -40,7 +40,7 @@ n_labels = 1
 obsrv_std = 0.01
 niters = 1
 status_properties = ['loss']
-latent_dim = 15
+latent_dim = 40
 
 ##################################################################
 
@@ -48,7 +48,7 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
 
     dim = latent_dim
     ode_func_net = utils.create_net(dim, latents, 
-        n_layers = 2, n_units = 10, nonlinear = nn.Tanh)
+        n_layers = 1, n_units = 20, nonlinear = nn.Tanh)
 
     gen_ode_func = ODEFunc(
         input_dim = input_dim, 
@@ -57,14 +57,14 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
         device = device).to(device)
         
     z0_diffeq_solver = None
-    n_rec_dims = 10 # rec_dims: default 20
+    n_rec_dims = 20 # rec_dims: default 20
     enc_input_dim = int(input_dim) * 2 # we concatenate the mask
     gen_data_dim = input_dim
 
     z0_dim = latent_dim
 
     ode_func_net = utils.create_net(n_rec_dims, n_rec_dims, 
-        n_layers = 2, n_units = 10, nonlinear = nn.Tanh)
+        n_layers = 1, n_units = 20, nonlinear = nn.Tanh)
 
     rec_ode_func = ODEFunc(
         input_dim = enc_input_dim, 
@@ -72,16 +72,16 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
         ode_func_net = ode_func_net,
         device = device).to(device)
 
-    z0_diffeq_solver = DiffeqSolver(enc_input_dim, rec_ode_func, "dopri5", latents, 
-        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+    z0_diffeq_solver = DiffeqSolver(enc_input_dim, rec_ode_func, "euler", latents, 
+        odeint_rtol = 1e-5, odeint_atol = 1e-6, device = device)
 
     encoder_z0 = Encoder_z0_ODE_RNN(n_rec_dims, enc_input_dim, z0_diffeq_solver, 
-        z0_dim = z0_dim, n_gru_units = 10, device = device).to(device)
+        z0_dim = z0_dim, n_gru_units = 20, device = device).to(device)
 
     decoder = Decoder(latents, input_dim=1).to(device)
 
     diffeq_solver = DiffeqSolver(gen_data_dim, gen_ode_func, 'dopri5', latents, 
-        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+        odeint_rtol = 1e-5, odeint_atol = 1e-6, device = device)
 
     model = LatentODE(
         input_dim = gen_data_dim, 
@@ -127,7 +127,7 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=0.003)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=0.1)
     # train_loader = torch.load('vae_train_loader.pt')
     # test_loader = torch.load('vae_cv_loader.pt')
     train_loader = torch.load('toy_train.pt')
