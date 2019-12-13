@@ -117,7 +117,7 @@ class GaiaLoaderFactory():
         # mask_train = Bernoulli(p).sample(torch.Size([bs, sl]))
         mask_train = (ys != 0).float()
         y_train = ys * mask_train
-        y_pred = ys
+        y_pred = ys * mask_train
         batch_dict = {'observed_data': y_train.to(device), 
                       'observed_tp': ts[0].view(-1).to(device), 
                       'data_to_predict': y_pred.to(device), 
