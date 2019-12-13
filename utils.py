@@ -8,6 +8,8 @@ import json
 import os
 from collections import defaultdict
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -16,7 +18,7 @@ def one_hot(labels, num_classes):
     y = y[labels]
     return y
 
-def collate_ts(data, device=torch.device('cpu')):
+def collate_ts(data, device=device):
         batch = torch.stack(data)
         bs = batch.size(0)
         sl = batch.size(2)

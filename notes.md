@@ -106,7 +106,7 @@ complexity of the dynamics.
 - Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers.
 - Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
 - At a crossroads where RNNs are being used less in favor of CNNs with attention and positional encodings. This is what is used in state of the art NLP models in the form of the transformer architecture.
-- Unevenly spaced, show gaps in measurements
+- Unevenly spaced, show gaps in measurements - do a heatmap like at MT
 - Explain and demonstrate: Interpolation, extrapolation, concept of latent state instead of just prediction (inc. compression effect), concept of similarity, concept of search, simulate inputs then getting state and searching db with this, concept of query within db to find strange objects.
 - Batching in non-homogenous time series - get the union and batch on intersection?
 
