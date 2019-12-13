@@ -26,17 +26,40 @@ def collate_ts(data, device=device):
         y_obs = batch[:, 1].unsqueeze(-1)
         y_truth = batch[:, 2].unsqueeze(-1)
         mask_train = (y_obs != 0).float()
+        mask_truth = (y_truth != 0).float()
         y_obs = y_obs * mask_train
         batch_dict = {'observed_data': y_obs.to(device), 
                       'observed_tp': ts[0].view(-1).to(device), 
                       'data_to_predict': y_truth.to(device), 
                       'tp_to_predict': ts[0].view(-1).to(device), 
                       'observed_mask': mask_train.to(device), 
-                      'mask_predicted_data': None, 
+                      'mask_predicted_data': mask_truth.to(device), 
                       'labels': None, 
                       'mode': 'interp', 
                       'labels': None}
-        batch_dict = batchify(batch_dict)
+        # batch_dict = batchify(batch_dict)
+        return batch_dict
+
+def collate_extrap(data, device=device):
+        batch = torch.stack(data)
+        bs = batch.size(0)
+        sl = batch.size(-1)
+        t1 = batch[:, 0]
+        t2 = batch[:, 1]
+        y1 = batch[:, 2].unsqueeze(-1)
+        y2 = batch[:, 3].unsqueeze(-1)
+        mask1 = (y1 != 0).float()
+        mask2 = (y2 != 0).float()
+        batch_dict = {'observed_data': y1.to(device), 
+                      'observed_tp': t1[0].view(-1).to(device), 
+                      'data_to_predict': y2.to(device), 
+                      'tp_to_predict': t2[0].view(-1).to(device), 
+                      'observed_mask': mask1.to(device), 
+                      'mask_predicted_data': mask2.to(device), 
+                      'labels': None, 
+                      'mode': 'extrap', 
+                      'labels': None}
+        # batch_dict = batchify(batch_dict)
         return batch_dict
 
 def batchify(data_dict):

@@ -101,14 +101,14 @@ complexity of the dynamics.
 - Multiple input and output results in the same output vector, which can be added to the db. The query vector will then be the output of the neural network that took in these multiple inputs.
 
 # ML
-- Stress that ML is more than just classification
+- Stress that ML is more than just classification. In reality we don't have lots of labeled data, and it can be mislabeled as this is done by humans.
 - Can even use the method for spectroscopy. The non-linear way it gets encoded captures different combnations of elements and will cluster phenomena together.
 - Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers.
 - Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
 - At a crossroads where RNNs are being used less in favor of CNNs with attention and positional encodings. This is what is used in state of the art NLP models in the form of the transformer architecture.
 - Unevenly spaced, show gaps in measurements - do a heatmap like at MT
 - Explain and demonstrate: Interpolation, extrapolation, concept of latent state instead of just prediction (inc. compression effect), concept of similarity, concept of search, simulate inputs then getting state and searching db with this, concept of query within db to find strange objects.
-- Batching in non-homogenous time series - get the union and batch on intersection?
+- Batching in non-homogenous time series - get the union and batch on intersection? For the sake of reducing the size of the union of time points I round to the nearest 3rd decimal. This discretization doesn't drastically reduce the number of observations. 
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public

@@ -128,7 +128,7 @@ class GaiaLoaderFactory():
                       'mode': 'interp', 
                       'labels': None,
                       'sources': fname}
-        batch_dict = batchify(batch_dict)
+        # batch_dict = batchify(batch_dict)
         return batch_dict
 
 class TessDataset(torch.utils.data.Dataset):
