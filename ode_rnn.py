@@ -46,7 +46,7 @@ latent_dim = 10
 
 ##################################################################
 # Model
-obsrv_std = torch.Tensor([0.01]).to(device)
+obsrv_std = torch.Tensor([0.1]).to(device)
 z0_prior = Normal(torch.Tensor([0.0]).to(device), torch.Tensor([1.]).to(device))
 gru_units = 32
 n_ode_gru_dims = latent_dim
@@ -95,6 +95,7 @@ if __name__ == '__main__':
     # train_loader = torch.load('vae_train_loader.pt')
     # test_loader = torch.load('vae_cv_loader.pt')
     train_loader = torch.load('toy_train.pt')
+    train_loader = torch.load('ucr_train.pt')
     # test_loader = torch.load('toy_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 20
