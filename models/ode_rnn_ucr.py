@@ -38,9 +38,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 input_dim = 1
 classif_per_tp = False
 n_labels = 1
+obsrv_std = 0.01
 niters = 1
 status_properties = ['loss']
 latent_dim = 25
+
 
 ##################################################################
 # Model

@@ -93,6 +93,7 @@ class GaiaLoaderFactory():
         cv_srcs = sources[L:]
         train_data = {k:np.stack(v) for k,v in data_dict.items() if k in train_srcs}
         cv_data = {k:np.stack(v) for k,v in data_dict.items() if k in cv_srcs}
+        import pdb; pdb.set_trace()
         train_ds = GaiaDataset(train_data)
         cv_ds = GaiaDataset(cv_data)
         train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ae, drop_last=True)

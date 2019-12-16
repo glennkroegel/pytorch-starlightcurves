@@ -10,7 +10,6 @@ sys.path.insert(1, '../latent_ode/')
 import latent_ode.lib as ode
 import latent_ode.lib.utils as utils
 from latent_ode.lib.latent_ode import LatentODE
-from latent_ode.lib.ode_rnn import ODE_RNN
 from latent_ode.lib.encoder_decoder import Encoder_z0_ODE_RNN, Decoder
 from latent_ode.lib.diffeq_solver import DiffeqSolver
 from latent_ode.lib.ode_func import ODEFunc
@@ -38,38 +37,77 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 input_dim = 1
 classif_per_tp = False
 n_labels = 1
+obsrv_std = 0.1
 niters = 1
 status_properties = ['loss']
-latent_dim = 25
+latent_dim = 30
+
+##################################################################
+
+def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, classif_per_tp = False, n_labels = 1, latents=latent_dim):
+
+    dim = latent_dim
+    ode_func_net = utils.create_net(dim, latents, 
+        n_layers = 2, n_units = 20, nonlinear = nn.Tanh)
+
+    gen_ode_func = ODEFunc(
+        input_dim = input_dim, 
+        latent_dim = latent_dim, 
+        ode_func_net = ode_func_net,
+        device = device).to(device)
+        
+    z0_diffeq_solver = None
+    n_rec_dims = 20 # rec_dims: default 20
+    enc_input_dim = int(input_dim) * 2 # we concatenate the mask
+    gen_data_dim = input_dim
+
+    z0_dim = latent_dim
+
+    ode_func_net = utils.create_net(n_rec_dims, n_rec_dims, 
+        n_layers = 2, n_units = 20, nonlinear = nn.Tanh)
+
+    rec_ode_func = ODEFunc(
+        input_dim = enc_input_dim, 
+        latent_dim = n_rec_dims,
+        ode_func_net = ode_func_net,
+        device = device).to(device)
+
+    z0_diffeq_solver = DiffeqSolver(enc_input_dim, rec_ode_func, "dopri5", latents, 
+        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+
+    encoder_z0 = Encoder_z0_ODE_RNN(n_rec_dims, enc_input_dim, z0_diffeq_solver, 
+        z0_dim = z0_dim, n_gru_units = 20, device = device).to(device)
+
+    decoder = Decoder(latents, input_dim=gen_data_dim).to(device)
+
+    diffeq_solver = DiffeqSolver(gen_data_dim, gen_ode_func, 'dopri5', latents, 
+        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+
+    model = LatentODE(
+        input_dim = gen_data_dim, 
+        latent_dim = latents, 
+        encoder_z0 = encoder_z0, 
+        decoder = decoder, 
+        diffeq_solver = diffeq_solver, 
+        z0_prior = z0_prior, 
+        device = device,
+        obsrv_std = obsrv_std,
+        use_poisson_proc = False, 
+        use_binary_classif = False,
+        linear_classifier = False,
+        classif_per_tp = False,
+        n_labels = n_labels,
+        train_classif_w_reconstr = False
+        ).to(device)
+
+    return model
 
 ##################################################################
 # Model
 obsrv_std = torch.Tensor([0.1]).to(device)
 z0_prior = Normal(torch.Tensor([0.0]).to(device), torch.Tensor([1.]).to(device))
-gru_units = 40
-n_ode_gru_dims = latent_dim
-				
-ode_func_net = utils.create_net(n_ode_gru_dims, n_ode_gru_dims, 
-    n_layers = 2, n_units = 50, nonlinear = nn.Tanh)
 
-rec_ode_func = ODEFunc(
-    input_dim = input_dim, 
-    latent_dim = n_ode_gru_dims,
-    ode_func_net = ode_func_net,
-    device = device).to(device)
-
-z0_diffeq_solver = DiffeqSolver(input_dim, rec_ode_func, "dopri5", latent_dim, 
-    odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
-
-model = ODE_RNN(input_dim=input_dim, latent_dim=latent_dim, 
-            n_gru_units = 50, n_units = 50, device = device, 
-			z0_diffeq_solver = z0_diffeq_solver,
-			concat_mask = True, obsrv_std = obsrv_std,
-			use_binary_classif = False,
-			classif_per_tp = False,
-			n_labels = 1,
-			train_classif_w_reconstr = False
-			).to(device)
+model = create_LatentODE_model(input_dim, z0_prior, obsrv_std)
 
 ##################################################################
 # Training
@@ -93,8 +131,7 @@ if __name__ == '__main__':
     # train_loader = torch.load('vae_train_loader.pt')
     # test_loader = torch.load('vae_cv_loader.pt')
     # train_loader = torch.load('toy_train.pt')
-    train_loader = torch.load('ucr_train.pt')
-    cv_loader = torch.load('ucr_cv.pt')
+    train_loader = torch.load('ucr_train_extrap.pt')
     # test_loader = torch.load('toy_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 5
@@ -110,26 +147,19 @@ if __name__ == '__main__':
             if i % 20 == 0:
                 print(i)
             optimizer.zero_grad()
-            train_res = model.compute_all_losses(data, n_traj_samples=10, kl_coef=kl_coef)
+            train_res = model.compute_all_losses(data, n_traj_samples=5, kl_coef=kl_coef)
             train_res['loss'].backward()
             train_props['loss'] += train_res['loss'].detach().item()
             optimizer.step()
         train_props = {k:v/len(train_loader) for k,v in train_props.items()}
         loss = train_props['loss']
-        cv_props = {k:0 for k in status_properties}
-        with torch.no_grad():
-            for i, data in enumerate(cv_loader):
-                cv_res = model.compute_all_losses(data, n_traj_samples=10, kl_coef=kl_coef)
-                cv_props['loss'] += cv_res['loss'].detach().item()
-            cv_props = {k:v/len(cv_loader) for k,v in cv_props.items()}
-        cv_loss = cv_props['loss']
-        status(epoch, train_props, cv_props)
-        if cv_loss < best_loss:
-            best_loss = cv_loss
+        status(epoch, train_props)
+        if loss < best_loss:
+            best_loss = loss
             print('Saving state...')
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_ucr.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'latent_ode_state_ucr_extrap.pth.tar')
         if epoch > 50:
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_ucr50.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'latent_ode_state50.pth.tar')
 
 
         
