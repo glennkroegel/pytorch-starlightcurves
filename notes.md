@@ -4,6 +4,7 @@
 - To get an interpretation we need the model to simply solve a task
 - In the case of time series, this can be interpolation, extrapolation or classification. 
 
+- The absense of evidence is not evidence of absense
 
 # Notes on Bayesnn
 If we have a network which can capture complex time series (including transients) and we have correct classification of objects, we can then begin to cluster these objects using a Bayesian NN.
@@ -103,7 +104,7 @@ complexity of the dynamics.
 # ML
 - Stress that ML is more than just classification. In reality we don't have lots of labeled data, and it can be mislabeled as this is done by humans.
 - Can even use the method for spectroscopy. The non-linear way it gets encoded captures different combnations of elements and will cluster phenomena together.
-- Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers.
+- Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers since we are training on reconstruction of the signal, and since RNNs capture non-linearities we can also capture this complexity.
 - Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
 - At a crossroads where RNNs are being used less in favor of CNNs with attention and positional encodings. This is what is used in state of the art NLP models in the form of the transformer architecture.
 - Unevenly spaced, show gaps in measurements - do a heatmap like at MT
