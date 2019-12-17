@@ -119,5 +119,5 @@ complexity of the dynamics.
 - Tess (basis of planet hunters) - https://archive.stsci.edu/tess/bulk_downloads.html
 - National Radio Observatory - https://archive.nrao.edu/archive/advquery.jsp
 - https://exoplanetarchive.ipac.caltech.edu/cgi-bin/ICETimeSeriesViewer
-- Kepler - https://www.nasa.gov/kepler/education/getlightcurves
+- Kepler - https://www.nasa.gov/kepler/education/getlightcurves - Kepler time series scripts - https://exoplanetarchive.ipac.caltech.edu/bulk_data_download/
 - Herschel Space Observatory - largest infrared telescope

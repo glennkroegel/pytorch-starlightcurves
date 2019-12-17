@@ -40,15 +40,15 @@ n_labels = 1
 obsrv_std = 0.1
 niters = 1
 status_properties = ['loss']
-latent_dim = 10
+latent_dim = 30
 
 ##################################################################
 
-def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, classif_per_tp = False, n_labels = 1, latents=latent_dim):
+def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, classif_per_tp = False, n_labels = 1, latents=latent_dim, disable_bias=True):
 
     dim = latent_dim
     ode_func_net = utils.create_net(dim, latents, 
-        n_layers = 1, n_units = 20, nonlinear = nn.Tanh)
+        n_layers = 2, n_units = 20, nonlinear = nn.Tanh)
 
     gen_ode_func = ODEFunc(
         input_dim = input_dim, 
@@ -57,14 +57,14 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
         device = device).to(device)
         
     z0_diffeq_solver = None
-    n_rec_dims = 10 # rec_dims: default 20
+    n_rec_dims = 20 # rec_dims: default 20
     enc_input_dim = int(input_dim) * 2 # we concatenate the mask
     gen_data_dim = input_dim
 
     z0_dim = latent_dim
 
     ode_func_net = utils.create_net(n_rec_dims, n_rec_dims, 
-        n_layers = 1, n_units = 20, nonlinear = nn.Tanh)
+        n_layers = 2, n_units = 20, nonlinear = nn.Tanh)
 
     rec_ode_func = ODEFunc(
         input_dim = enc_input_dim, 
@@ -76,7 +76,7 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
         odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
 
     encoder_z0 = Encoder_z0_ODE_RNN(n_rec_dims, enc_input_dim, z0_diffeq_solver, 
-        z0_dim = z0_dim, n_gru_units = 10, device = device).to(device)
+        z0_dim = z0_dim, n_gru_units = 20, device = device).to(device)
 
     decoder = Decoder(latents, input_dim=gen_data_dim).to(device)
 
@@ -99,6 +99,11 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
         n_labels = n_labels,
         train_classif_w_reconstr = False
         ).to(device)
+
+    if disable_bias:
+        for module in model.modules():
+            if hasattr(module, 'bias'):
+                module.bias = None
 
     return model
 
@@ -127,12 +132,10 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-1)
-    # train_loader = torch.load('vae_train_loader.pt')
-    # test_loader = torch.load('vae_cv_loader.pt')
-    # train_loader = torch.load('toy_train.pt')
-    train_loader = torch.load('ucr_train_extrap.pt')
-    # test_loader = torch.load('toy_cv.pt')
+    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-2)
+    train_loader = torch.load('gaia_train.pt')
+    cv_loader = torch.load('gaia_cv.pt')
+
     num_batches = len(train_loader)
     kl_wait = 5
     num_epochs = NUM_EPOCHS
@@ -147,17 +150,25 @@ if __name__ == '__main__':
             if i % 20 == 0:
                 print(i)
             optimizer.zero_grad()
-            train_res = model.compute_all_losses(data, n_traj_samples=5, kl_coef=kl_coef)
+            train_res = model.compute_all_losses(data, n_traj_samples=50, kl_coef=kl_coef)
             train_res['loss'].backward()
             train_props['loss'] += train_res['loss'].detach().item()
             optimizer.step()
         train_props = {k:v/len(train_loader) for k,v in train_props.items()}
         loss = train_props['loss']
-        status(epoch, train_props)
-        if loss < best_loss:
-            best_loss = loss
+        # Cross validate
+        cv_props = {k:0 for k in status_properties}
+        with torch.no_grad():
+            for i, data in enumerate(cv_loader):
+                cv_res = model.compute_all_losses(data, n_traj_samples=50, kl_coef=kl_coef)
+                cv_props['loss'] += cv_res['loss'].detach().item()
+            cv_props = {k:v/len(cv_loader) for k,v in cv_props.items()}
+        cv_loss = cv_props['loss']
+        status(epoch, train_props, cv_props)
+        if cv_loss < best_loss:
+            best_loss = cv_loss
             print('Saving state...')
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'latent_ode_state.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'latent_ode_state_gaia_interp.pth.tar')
         if epoch > 50:
             torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'latent_ode_state50.pth.tar')
 

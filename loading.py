@@ -67,7 +67,7 @@ class GaiaLoaderFactory():
         self.path = 'gaia/'
         self.file = 'joined.csv'
 
-    def generate(self, batch_size=50, num_samples=1000, train_size=0.9):
+    def generate(self, batch_size=10, num_samples=1000, train_size=0.9):
         df = pd.read_csv(os.path.join(self.path, self.file))
         sources = list(df['source_id'].unique())
         sources = random.sample(sources, num_samples)
@@ -80,8 +80,8 @@ class GaiaLoaderFactory():
         df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
         # df = df.groupby(['source_id','time'])['flux_over_error'].mean()
         # df['scaled'] = df.groupby('source_id')['flux_over_error'].apply(lambda x: x/x.max())
-        # df['scaled'] = df.groupby('source_id')['flux_over_error'].transform(lambda x: x/x.max())
-        df['scaled'] = df.groupby('source_id')['flux_over_error'].transform(lambda x: (x-x.mean())/x.std())
+        df['scaled'] = df.groupby('source_id')['flux_over_error'].transform(lambda x: x/x.max())
+        # df['scaled'] = df.groupby('source_id')['flux_over_error'].transform(lambda x: (x-x.mean())/x.std())
         df = df.groupby(['source_id','time_resampled'])['scaled'].mean()
         df = df.unstack(1).fillna(0).stack()
         df.name = 'scaled'
@@ -93,7 +93,6 @@ class GaiaLoaderFactory():
         cv_srcs = sources[L:]
         train_data = {k:np.stack(v) for k,v in data_dict.items() if k in train_srcs}
         cv_data = {k:np.stack(v) for k,v in data_dict.items() if k in cv_srcs}
-        import pdb; pdb.set_trace()
         train_ds = GaiaDataset(train_data)
         cv_ds = GaiaDataset(cv_data)
         train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ae, drop_last=True)
@@ -129,7 +128,7 @@ class GaiaLoaderFactory():
                       'mode': 'interp', 
                       'labels': None,
                       'sources': fname}
-        # batch_dict = batchify(batch_dict)
+        batch_dict = batchify(batch_dict)
         return batch_dict
 
 class TessDataset(torch.utils.data.Dataset):

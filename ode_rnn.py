@@ -40,7 +40,7 @@ classif_per_tp = False
 n_labels = 1
 niters = 1
 status_properties = ['loss']
-latent_dim = 25
+latent_dim = 40
 
 ##################################################################
 # Model
@@ -50,7 +50,7 @@ gru_units = 40
 n_ode_gru_dims = latent_dim
 				
 ode_func_net = utils.create_net(n_ode_gru_dims, n_ode_gru_dims, 
-    n_layers = 2, n_units = 50, nonlinear = nn.Tanh)
+    n_layers = 2, n_units = 100, nonlinear = nn.Tanh)
 
 rec_ode_func = ODEFunc(
     input_dim = input_dim, 
@@ -62,7 +62,7 @@ z0_diffeq_solver = DiffeqSolver(input_dim, rec_ode_func, "dopri5", latent_dim,
     odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
 
 model = ODE_RNN(input_dim=input_dim, latent_dim=latent_dim, 
-            n_gru_units = 50, n_units = 50, device = device, 
+            n_gru_units = 100, n_units = 100, device = device, 
 			z0_diffeq_solver = z0_diffeq_solver,
 			concat_mask = True, obsrv_std = obsrv_std,
 			use_binary_classif = False,
@@ -70,6 +70,12 @@ model = ODE_RNN(input_dim=input_dim, latent_dim=latent_dim,
 			n_labels = 1,
 			train_classif_w_reconstr = False
 			).to(device)
+
+disable_bias = True
+if disable_bias:
+    for module in model.modules():
+        if hasattr(module, 'bias'):
+            module.bias = None
 
 ##################################################################
 # Training
@@ -93,8 +99,8 @@ if __name__ == '__main__':
     # train_loader = torch.load('vae_train_loader.pt')
     # test_loader = torch.load('vae_cv_loader.pt')
     # train_loader = torch.load('toy_train.pt')
-    train_loader = torch.load('ucr_train.pt')
-    cv_loader = torch.load('ucr_cv.pt')
+    train_loader = torch.load('gaia_train.pt')
+    cv_loader = torch.load('gaia_cv.pt')
     # test_loader = torch.load('toy_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 5
@@ -127,9 +133,9 @@ if __name__ == '__main__':
         if cv_loss < best_loss:
             best_loss = cv_loss
             print('Saving state...')
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_ucr.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_gaia.pth.tar')
         if epoch > 50:
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_ucr50.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_gaia50.pth.tar')
 
 
         
