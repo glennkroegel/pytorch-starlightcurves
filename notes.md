@@ -86,6 +86,9 @@ complexity of the dynamics.
 - Can do joint optical and infrared as well like Keck
 - We know Tabby's star is not aliens because it absorbs specific frequencies in infrared, meaning it is not opaque.
 
+# Radio Astronomy
+- Radio astronomy - nature doesn't like to produce narrow band signals, sources usually spill over into other frequencies. 
+
 
 # Similarity search
 
@@ -121,3 +124,7 @@ complexity of the dynamics.
 - https://exoplanetarchive.ipac.caltech.edu/cgi-bin/ICETimeSeriesViewer
 - Kepler - https://www.nasa.gov/kepler/education/getlightcurves - Kepler time series scripts - https://exoplanetarchive.ipac.caltech.edu/bulk_data_download/
 - Herschel Space Observatory - largest infrared telescope
+
+# Misc
+- https://twitter.com/tsboyajian/status/1181981342440906753
+- Say something about 1420 MHz

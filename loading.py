@@ -10,7 +10,7 @@ import numpy as np
 import glob
 import random
 from config import TRAIN_DATA, CV_DATA
-from utils import pooling, batchify
+from utils import pooling, batchify, collate_interp_sparse
 
 import torch
 import torch.nn.functional as F
@@ -67,7 +67,7 @@ class GaiaLoaderFactory():
         self.path = 'gaia/'
         self.file = 'joined.csv'
 
-    def generate(self, batch_size=10, num_samples=1000, train_size=0.9):
+    def generate(self, batch_size=32, num_samples=1000, train_size=0.9):
         df = pd.read_csv(os.path.join(self.path, self.file))
         sources = list(df['source_id'].unique())
         sources = random.sample(sources, num_samples)
@@ -128,7 +128,7 @@ class GaiaLoaderFactory():
                       'mode': 'interp', 
                       'labels': None,
                       'sources': fname}
-        batch_dict = batchify(batch_dict)
+        # batch_dict = batchify(batch_dict)
         return batch_dict
 
 class TessDataset(torch.utils.data.Dataset):
@@ -139,25 +139,26 @@ class TessDataset(torch.utils.data.Dataset):
         filename = self.files[i]
         data = np.load(self.files[i]).astype(np.float32)
         data = torch.FloatTensor(data)
-        return filename, data
+        return data
 
     def __len__(self):
         return len(self.files)
 
 class TessLoaderFactory():
     '''Load Tess time series data in batches for DL models'''
-    def __init__(self):
-        self.path = 'tess/processed'
+    def __init__(self, path='tess/processed_time_union'):
+        self.path = path
         self.files = glob.glob(os.path.join(self.path, '*.npy'))
 
-    def generate(self, batch_size=1, train_size=0.9):
-        L = int(train_size*len(self.files))
-        train_files = self.files[:L]
-        cv_files = self.files[L:]
+    def generate(self, batch_size=50, num_samples=3000, train_size=0.9):
+        files = random.sample(self.files, num_samples)
+        L = int(train_size*len(files))
+        train_files = files[:L]
+        cv_files = files[L:]
         train_ds = TessDataset(train_files)
         cv_ds = TessDataset(cv_files)
-        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=self.collate_ae)
-        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ae)
+        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=collate_interp_sparse)
+        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=collate_interp_sparse)
         torch.save(train_loader, 'tess_train.pt')
         torch.save(cv_loader, 'tess_cv.pt')
 
@@ -351,4 +352,8 @@ class VAEDataLoaderFactory():
                       'mask_predicted_data': None, 
                       'labels': None, 'mode': 'interp'}
         return batch_dict
+
+if __name__ == "__main__":
+    f = TessLoaderFactory()
+    f.generate()
 
