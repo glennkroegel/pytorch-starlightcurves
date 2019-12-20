@@ -36,10 +36,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ##################################################################
 # Options
-input_dim = 1
-classif_per_tp = False
+input_dim = 2
 n_labels = 1
-niters = 1
 status_properties = ['loss', 'ratio']
 latent_dim = 40
 
@@ -100,8 +98,8 @@ if __name__ == '__main__':
     # train_loader = torch.load('vae_train_loader.pt')
     # test_loader = torch.load('vae_cv_loader.pt')
     # train_loader = torch.load('toy_train.pt')
-    train_loader = torch.load('tess_train.pt')
-    cv_loader = torch.load('tess_cv.pt')
+    train_loader = torch.load('gaia2d_train.pt')
+    cv_loader = torch.load('gaia2d_cv.pt')
     # test_loader = torch.load('toy_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 5

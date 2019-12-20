@@ -10,7 +10,7 @@ import numpy as np
 import glob
 import random
 from config import TRAIN_DATA, CV_DATA
-from utils import pooling, batchify, collate_interp_sparse
+from utils import pooling, batchify, collate_interp_sparse, collate_2d
 
 import torch
 import torch.nn.functional as F
@@ -56,7 +56,7 @@ class GaiaDataset(torch.utils.data.Dataset):
         data = self.data[source]
         data = torch.FloatTensor(data)
         data.transpose_(0,1)
-        return source, data
+        return data
 
     def __len__(self):
         return len(self.sources)
@@ -99,6 +99,35 @@ class GaiaLoaderFactory():
         cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=self.collate_ae, drop_last=True)
         torch.save(train_loader, 'gaia_train.pt')
         torch.save(cv_loader, 'gaia_cv.pt')
+
+    def generate2d(self, batch_size=32, num_samples=1000, train_size=0.9):
+        df = pd.read_csv(os.path.join(self.path, self.file))
+        sources = list(df['source_id'].unique())
+        sources = random.sample(sources, num_samples)
+        df = df.loc[df['source_id'].isin(sources)]
+        df = df.loc[df['band'] != 'G']
+        df = df.loc[~(df['rejected_by_photometry'] | df['rejected_by_variability'])]
+        df['time'] = df['time'].astype(np.float32)
+        df = df[(df['time']>2210) & (df['time']<2222)]
+        df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
+        df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: x/x.max())
+        grouped = df.groupby(['source_id','band','time_resampled'])['scaled'].mean()
+        grouped = grouped.unstack(2).fillna(0).stack()
+        grouped.name = 'scaled'
+        grouped = grouped.unstack(1).reset_index().groupby(['source_id'])[['time_resampled','BP','RP']].apply(
+            lambda x: sorted(list(x.values.astype(np.float32)), key=lambda x: x[0]))
+        data_dict = grouped.to_dict()
+        L = int(train_size*len(sources))
+        train_srcs = sources[:L]
+        cv_srcs = sources[L:]
+        train_data = {k:np.stack(v) for k,v in data_dict.items() if k in train_srcs}
+        cv_data = {k:np.stack(v) for k,v in data_dict.items() if k in cv_srcs}
+        train_ds = GaiaDataset(train_data)
+        cv_ds = GaiaDataset(cv_data)
+        train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=collate_2d, drop_last=True)
+        cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=collate_2d, drop_last=True)
+        torch.save(train_loader, 'gaia2d_train.pt')
+        torch.save(cv_loader, 'gaia2d_cv.pt')
 
     def collate_ae(self, data, train_p=0.75):
         fname = []

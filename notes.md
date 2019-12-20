@@ -74,6 +74,7 @@ complexity of the dynamics.
 - Blue photometer (330-680nm)
 - Red photometer (640-1050nm)
 - I resampled the data and aggregated by mean. Number of samples per object follows a distribution, even within measurement windows.
+- I desabled bias
 
 # Astronomy
 - Explain flux over error and MJD
@@ -114,6 +115,8 @@ complexity of the dynamics.
 - Explain and demonstrate: Interpolation, extrapolation, concept of latent state instead of just prediction (inc. compression effect), concept of similarity, concept of search, simulate inputs then getting state and searching db with this, concept of query within db to find strange objects.
 - Batching in non-homogenous time series - get the union and batch on intersection? For the sake of reducing the size of the union of time points I round to the nearest 3rd decimal. This discretization doesn't drastically reduce the number of observations. 
 - Switching L1 loss for L2 I found is better at capturing small local oscillations probably since larger.
+- Disabled bias
+- Clustering, one-vs-all similarity search for most unique objects
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public
