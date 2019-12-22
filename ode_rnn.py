@@ -95,12 +95,8 @@ if __name__ == '__main__':
     
     print(model)
     optimizer = torch.optim.Adamax(model.parameters(), lr=1e-2)
-    # train_loader = torch.load('vae_train_loader.pt')
-    # test_loader = torch.load('vae_cv_loader.pt')
-    # train_loader = torch.load('toy_train.pt')
     train_loader = torch.load('gaia2d_train.pt')
     cv_loader = torch.load('gaia2d_cv.pt')
-    # test_loader = torch.load('toy_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 5
     num_epochs = NUM_EPOCHS
@@ -134,9 +130,9 @@ if __name__ == '__main__':
         if cv_loss < best_loss:
             best_loss = cv_loss
             print('Saving state...')
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_tess.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_gaia2d.pth.tar')
         if epoch > 50:
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_tess50.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_gaia2d50.pth.tar')
 
 
         

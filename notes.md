@@ -74,7 +74,8 @@ complexity of the dynamics.
 - Blue photometer (330-680nm)
 - Red photometer (640-1050nm)
 - I resampled the data and aggregated by mean. Number of samples per object follows a distribution, even within measurement windows.
-- I desabled bias
+- I disabled bias
+- scaling the two bands as either x/max for each or as the ratio between them, can probably lead to different interpretation.
 
 # Astronomy
 - Explain flux over error and MJD

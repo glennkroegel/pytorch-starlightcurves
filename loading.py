@@ -110,18 +110,25 @@ class GaiaLoaderFactory():
         df['time'] = df['time'].astype(np.float32)
         df = df[(df['time']>2210) & (df['time']<2222)]
         df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
-        df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: x/x.max())
+        # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: x/x.max())
+        df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: np.log10(1+x)-1.5)
         grouped = df.groupby(['source_id','band','time_resampled'])['scaled'].mean()
         grouped = grouped.unstack(2).fillna(0).stack()
+        grouped.fillna(0, inplace=True)
         grouped.name = 'scaled'
         grouped = grouped.unstack(1).reset_index().groupby(['source_id'])[['time_resampled','BP','RP']].apply(
             lambda x: sorted(list(x.values.astype(np.float32)), key=lambda x: x[0]))
         data_dict = grouped.to_dict()
+        data = {}
+        for k,v in data_dict.items():
+            stacked = np.stack(v)
+            stacked[np.isnan(stacked)] = 0.
+            data[k] = stacked
         L = int(train_size*len(sources))
         train_srcs = sources[:L]
         cv_srcs = sources[L:]
-        train_data = {k:np.stack(v) for k,v in data_dict.items() if k in train_srcs}
-        cv_data = {k:np.stack(v) for k,v in data_dict.items() if k in cv_srcs}
+        train_data = {k:v for k,v in data.items() if k in train_srcs}
+        cv_data = {k:v for k,v in data.items() if k in cv_srcs}
         train_ds = GaiaDataset(train_data)
         cv_ds = GaiaDataset(cv_data)
         train_loader = DataLoader(train_ds, batch_size=batch_size, collate_fn=collate_2d, drop_last=True)
