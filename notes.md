@@ -76,6 +76,9 @@ complexity of the dynamics.
 - I resampled the data and aggregated by mean. Number of samples per object follows a distribution, even within measurement windows.
 - I disabled bias
 - scaling the two bands as either x/max for each or as the ratio between them, can probably lead to different interpretation.
+- scaling: x/x_max where x_max is maximum for all measurements in all bands not just one. So not 2x xmaxs. Maintains relative strengths.
+- scaling: x/x_max_band where we use respective max for each band. Lose relative strength but keep trends - can see when not correlated.
+- scaling: log magnitude - easier to train - centred around zero but is not magnitude/distance invariant - closer objects less comparable to same objects at distance.
 
 # Astronomy
 - Explain flux over error and MJD

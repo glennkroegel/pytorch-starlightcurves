@@ -94,7 +94,7 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-3)
     train_loader = torch.load('gaia2d_train.pt')
     cv_loader = torch.load('gaia2d_cv.pt')
     num_batches = len(train_loader)

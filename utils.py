@@ -99,7 +99,7 @@ def collate_2d(data, device=device):
                     'labels': None, 
                     'mode': 'interp', 
                     'labels': None}
-    # batch_dict = batchify(batch_dict)
+    batch_dict = batchify(batch_dict)
     return batch_dict
 
 def batchify(data_dict):
