@@ -79,6 +79,7 @@ complexity of the dynamics.
 - scaling: x/x_max where x_max is maximum for all measurements in all bands not just one. So not 2x xmaxs. Maintains relative strengths.
 - scaling: x/x_max_band where we use respective max for each band. Lose relative strength but keep trends - can see when not correlated.
 - scaling: log magnitude - easier to train - centred around zero but is not magnitude/distance invariant - closer objects less comparable to same objects at distance.
+- interval: some intervals measured lots of objects but only had a few points, while others looked at fewer objects for longer times. I opted to filter by better measurements. Variable length!
 
 # Astronomy
 - Explain flux over error and MJD
@@ -116,11 +117,13 @@ complexity of the dynamics.
 - Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
 - At a crossroads where RNNs are being used less in favor of CNNs with attention and positional encodings. This is what is used in state of the art NLP models in the form of the transformer architecture.
 - Unevenly spaced, show gaps in measurements - do a heatmap like at MT
+- Issue of variable length
 - Explain and demonstrate: Interpolation, extrapolation, concept of latent state instead of just prediction (inc. compression effect), concept of similarity, concept of search, simulate inputs then getting state and searching db with this, concept of query within db to find strange objects.
 - Batching in non-homogenous time series - get the union and batch on intersection? For the sake of reducing the size of the union of time points I round to the nearest 3rd decimal. This discretization doesn't drastically reduce the number of observations. 
 - Switching L1 loss for L2 I found is better at capturing small local oscillations probably since larger.
 - Disabled bias
 - Clustering, one-vs-all similarity search for most unique objects
+- If you have clusters you can then map them accross the sky or produce a power spectrum. Potentially provide insight and validation of cosmological models.
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public

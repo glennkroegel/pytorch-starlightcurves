@@ -84,11 +84,15 @@ def collate_interp_sparse(data, device=device):
 
 def collate_2d(data, device=device):
     '''No subsample, 2d interpolation.'''
-    batch = torch.stack(data)
+    if not isinstance(data, torch.Tensor):
+        batch = torch.stack(data)
+    else:
+        batch = data
     bs = batch.size(0)
     sl = batch.size(-1)
     ts = batch[:, 0][0]
     y = batch[:, 1:].permute(0, 2, 1)
+    y[torch.isnan(y)] = 0.
     mask = (y != 0).float()
     batch_dict = {'observed_data': y.to(device), 
                     'observed_tp': ts.view(-1).to(device), 
@@ -130,6 +134,25 @@ def batchify(data_dict):
     batch_dict["mode"] = data_dict["mode"]
     batch_dict["labels"] = data_dict["labels"]
     return batch_dict
+
+def process_gaia_csv(infile, min_count=15):
+    df = pd.read_csv(infile)
+    df = df.loc[df['band'] != 'G']
+    df = df.loc[~(df['rejected_by_photometry'] | df['rejected_by_variability'])]
+    df['time'] = df['time'].astype(np.float32)
+    df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
+    df['interval'] = pd.cut(df['time_resampled'], 100, precision=2)
+    # interval = df.groupby('interval')['source_id'].apply(
+    #     lambda x: len(x.unique())).sort_values(ascending=False).head(1).index[0]
+    interval = df.groupby('interval')['source_id'].count().sort_values(ascending=False).head(1).index[0]
+    df = df.loc[df['interval'] == interval]
+    df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: x/x.max())
+    # df['scaled'] = df.groupby(['source_id'])['flux_over_error'].transform(lambda x: x/x.max())
+    # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: np.log10(1+x)-1.5)
+    counts = df.groupby('source_id')['scaled'].count()
+    keep = counts[counts > min_count]
+    df = df.loc[df['source_id'].isin(keep.index)]
+    return df
 
 def increase_resolution(batch, T=1000):
     batch = torch.stack(batch)

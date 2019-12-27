@@ -10,7 +10,7 @@ import numpy as np
 import glob
 import random
 from config import TRAIN_DATA, CV_DATA
-from utils import pooling, batchify, collate_interp_sparse, collate_2d
+from utils import pooling, batchify, collate_interp_sparse, collate_2d, process_gaia_csv
 
 import torch
 import torch.nn.functional as F
@@ -101,23 +101,25 @@ class GaiaLoaderFactory():
         torch.save(cv_loader, 'gaia_cv.pt')
 
     def generate2d(self, batch_size=25, num_samples=6000, train_size=0.9):
-        df = pd.read_csv(os.path.join(self.path, self.file))
+        # df = pd.read_csv(os.path.join(self.path, self.file))
+        # sources = list(df['source_id'].unique())
+        # sources = random.sample(sources, num_samples)
+        # df = df.loc[df['source_id'].isin(sources)]
+        # df = df.loc[df['band'] != 'G']
+        # df = df.loc[~(df['rejected_by_photometry'] | df['rejected_by_variability'])]
+        # df['time'] = df['time'].astype(np.float32)
+        # df = df[(df['time']>2150) & (df['time']<2200)]
+        # # df = df[(df['time']>2100)]
+        # df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
+        # # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: x/x.max())
+        # # df['scaled'] = df.groupby(['source_id'])['flux_over_error'].transform(lambda x: x/x.max())
+        # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: np.log10(1+x)-1.5)
+        # counts = df.groupby('source_id')['scaled'].count()
+        # keep = counts[counts > 10]
+        # df = df.loc[df['source_id'].isin(keep.index)]
+        df = process_gaia_csv(os.path.join(self.path, self.file), min_count=20)
         sources = list(df['source_id'].unique())
-        sources = random.sample(sources, num_samples)
-        df = df.loc[df['source_id'].isin(sources)]
-        df = df.loc[df['band'] != 'G']
-        df = df.loc[~(df['rejected_by_photometry'] | df['rejected_by_variability'])]
-        df['time'] = df['time'].astype(np.float32)
-        df = df[(df['time']>2150) & (df['time']<2200)]
-        # df = df[(df['time']>2100)]
-        df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
-        # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: x/x.max())
-        # df['scaled'] = df.groupby(['source_id'])['flux_over_error'].transform(lambda x: x/x.max())
-        df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: np.log10(1+x)-1.5)
-        counts = df.groupby('source_id')['scaled'].count()
-        keep = counts[counts > 10]
-        df = df.loc[df['source_id'].isin(keep.index)]
-        print(len(df['source_id'].unique()))
+        print(len(sources))
         # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: np.log10(1+x)-1.5)
         grouped = df.groupby(['source_id','band','time_resampled'])['scaled'].mean()
         grouped = grouped.unstack(2).fillna(0).stack()

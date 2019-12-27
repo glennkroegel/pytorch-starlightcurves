@@ -43,38 +43,45 @@ latent_dim = 40
 
 ##################################################################
 # Model
-obsrv_std = torch.Tensor([0.1]).to(device)
-z0_prior = Normal(torch.Tensor([0.0]).to(device), torch.Tensor([1.]).to(device))
-gru_units = 40
-n_ode_gru_dims = latent_dim
-				
-ode_func_net = utils.create_net(n_ode_gru_dims, n_ode_gru_dims, 
-    n_layers = 2, n_units = 100, nonlinear = nn.Tanh)
 
-rec_ode_func = ODEFunc(
-    input_dim = input_dim, 
-    latent_dim = n_ode_gru_dims,
-    ode_func_net = ode_func_net,
-    device = device).to(device)
+def create_ODERNN_model():
 
-z0_diffeq_solver = DiffeqSolver(input_dim, rec_ode_func, "dopri5", latent_dim, 
-    odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+    obsrv_std = torch.Tensor([0.1]).to(device)
+    z0_prior = Normal(torch.Tensor([0.0]).to(device), torch.Tensor([1.]).to(device))
+    gru_units = 40
+    n_ode_gru_dims = latent_dim
+                    
+    ode_func_net = utils.create_net(n_ode_gru_dims, n_ode_gru_dims, 
+        n_layers = 2, n_units = 100, nonlinear = nn.Tanh)
 
-model = ODE_RNN(input_dim=input_dim, latent_dim=latent_dim, 
-            n_gru_units = 100, n_units = 100, device = device, 
-			z0_diffeq_solver = z0_diffeq_solver,
-			concat_mask = True, obsrv_std = obsrv_std,
-			use_binary_classif = False,
-			classif_per_tp = False,
-			n_labels = 1,
-			train_classif_w_reconstr = False
-			).to(device)
+    rec_ode_func = ODEFunc(
+        input_dim = input_dim, 
+        latent_dim = n_ode_gru_dims,
+        ode_func_net = ode_func_net,
+        device = device).to(device)
 
-disable_bias = True
-if disable_bias:
-    for module in model.modules():
-        if hasattr(module, 'bias'):
-            module.bias = None
+    z0_diffeq_solver = DiffeqSolver(input_dim, rec_ode_func, "dopri5", latent_dim, 
+        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+
+    model = ODE_RNN(input_dim=input_dim, latent_dim=latent_dim, 
+                n_gru_units = 100, n_units = 100, device = device, 
+                z0_diffeq_solver = z0_diffeq_solver,
+                concat_mask = True, obsrv_std = obsrv_std,
+                use_binary_classif = False,
+                classif_per_tp = False,
+                n_labels = 1,
+                train_classif_w_reconstr = False
+                ).to(device)
+
+    disable_bias = True
+    if disable_bias:
+        for module in model.modules():
+            if hasattr(module, 'bias'):
+                module.bias = None
+    
+    return model
+
+model = create_ODERNN_model()
 
 ##################################################################
 # Training
