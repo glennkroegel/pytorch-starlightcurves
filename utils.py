@@ -64,7 +64,10 @@ def collate_extrap(data, device=device):
 
 def collate_interp_sparse(data, device=device):
     '''No subsampling of obs measurement'''
-    batch = torch.stack(data)
+    if not isinstance(data, torch.Tensor):
+        batch = torch.stack(data)
+    else:
+        batch = data
     bs = batch.size(0)
     sl = batch.size(2)
     ts = batch[:, 0]

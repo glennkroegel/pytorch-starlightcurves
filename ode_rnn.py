@@ -36,7 +36,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ##################################################################
 # Options
-input_dim = 2
+input_dim = 1
 n_labels = 1
 status_properties = ['loss', 'ratio']
 latent_dim = 40
@@ -46,13 +46,13 @@ latent_dim = 40
 
 def create_ODERNN_model():
 
-    obsrv_std = torch.Tensor([0.1]).to(device)
+    obsrv_std = torch.Tensor([0.2]).to(device)
     z0_prior = Normal(torch.Tensor([0.0]).to(device), torch.Tensor([1.]).to(device))
     gru_units = 40
     n_ode_gru_dims = latent_dim
                     
     ode_func_net = utils.create_net(n_ode_gru_dims, n_ode_gru_dims, 
-        n_layers = 2, n_units = 100, nonlinear = nn.Tanh)
+        n_layers = 1, n_units = 100, nonlinear = nn.Tanh)
 
     rec_ode_func = ODEFunc(
         input_dim = input_dim, 
@@ -61,7 +61,7 @@ def create_ODERNN_model():
         device = device).to(device)
 
     z0_diffeq_solver = DiffeqSolver(input_dim, rec_ode_func, "dopri5", latent_dim, 
-        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
+        odeint_rtol = 1e-5, odeint_atol = 1e-7, device = device)
 
     model = ODE_RNN(input_dim=input_dim, latent_dim=latent_dim, 
                 n_gru_units = 50, n_units = 50, device = device, 
@@ -73,7 +73,7 @@ def create_ODERNN_model():
                 train_classif_w_reconstr = False
                 ).to(device)
 
-    disable_bias = False
+    disable_bias = True
     if disable_bias:
         for module in model.modules():
             if hasattr(module, 'bias'):
@@ -101,9 +101,9 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-4)
-    train_loader = torch.load('gaia2d_train.pt')
-    cv_loader = torch.load('gaia2d_cv.pt')
+    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-2)
+    train_loader = torch.load('tess_train.pt')
+    cv_loader = torch.load('tess_cv.pt')
     num_batches = len(train_loader)
     kl_wait = 5
     num_epochs = NUM_EPOCHS
@@ -137,9 +137,9 @@ if __name__ == '__main__':
         if cv_loss < best_loss:
             best_loss = cv_loss
             print('Saving state...')
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_gaia2d.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_tess_new.pth.tar')
         if epoch > 50:
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_gaia2d50.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state50.pth.tar')
 
 
         

@@ -35,7 +35,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ##################################################################
 # Options
-input_dim = 2
+input_dim = 1
 classif_per_tp = False
 n_labels = 1
 obsrv_std = 0.1
@@ -133,9 +133,9 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-3)
-    train_loader = torch.load('gaia2d_train.pt')
-    cv_loader = torch.load('gaia2d_cv.pt')
+    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-2)
+    train_loader = torch.load('tess_train.pt')
+    cv_loader = torch.load('tess_train.pt')
 
     num_batches = len(train_loader)
     kl_wait = 5
@@ -143,15 +143,15 @@ if __name__ == '__main__':
     best_loss = np.inf
 
     for epoch in tqdm(range(num_epochs)):
-        # kl_coef = (1 - 0.95 ** (epoch - kl_wait)) if epoch > kl_wait else 0
-        # print(kl_coef)
+        kl_coef = (1 - 0.95 ** (epoch - kl_wait)) if epoch > kl_wait else 0
+        print(kl_coef)
         train_loss = 0
         train_props = {k:0 for k in status_properties}
         for i, data in enumerate(train_loader):
             if i % 20 == 0:
                 print(i)
             optimizer.zero_grad()
-            train_res = model.compute_all_losses(data, n_traj_samples=50)
+            train_res = model.compute_all_losses(data, n_traj_samples=50, kl_coef=kl_coef)
             train_res['loss'].backward()
             train_props['loss'] += train_res['loss'].detach().item()
             optimizer.step()
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         cv_props = {k:0 for k in status_properties}
         with torch.no_grad():
             for i, data in enumerate(cv_loader):
-                cv_res = model.compute_all_losses(data, n_traj_samples=50)
+                cv_res = model.compute_all_losses(data, n_traj_samples=50, kl_coef=kl_coef)
                 cv_props['loss'] += cv_res['loss'].detach().item()
             cv_props = {k:v/len(cv_loader) for k,v in cv_props.items()}
         cv_loss = cv_props['loss']
@@ -169,7 +169,7 @@ if __name__ == '__main__':
         if cv_loss < best_loss:
             best_loss = cv_loss
             print('Saving state...')
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'latent_ode_state_gaia2d.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'latent_ode_state.pth.tar')
         if epoch > 50:
             torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'latent_ode_state50.pth.tar')
 
