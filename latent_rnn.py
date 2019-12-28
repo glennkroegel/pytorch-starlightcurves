@@ -45,7 +45,7 @@ latent_dim = 40
 
 ##################################################################
 
-def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, classif_per_tp = False, n_labels = 1, latents=latent_dim, disable_bias=True):
+def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, classif_per_tp = False, n_labels = 1, latents=latent_dim, disable_bias=False):
 
     dim = latent_dim
     ode_func_net = utils.create_net(dim, latents, 
@@ -82,7 +82,7 @@ def create_LatentODE_model(input_dim, z0_prior, obsrv_std, device = device, clas
     decoder = Decoder(latents, input_dim=gen_data_dim).to(device)
 
     diffeq_solver = DiffeqSolver(gen_data_dim, gen_ode_func, 'dopri5', latents, 
-        odeint_rtol = 1e-5, odeint_atol = 1e-6, device = device)
+        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
 
     model = LatentODE(
         input_dim = gen_data_dim, 
@@ -133,7 +133,7 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-3)
     train_loader = torch.load('gaia2d_train.pt')
     cv_loader = torch.load('gaia2d_cv.pt')
 

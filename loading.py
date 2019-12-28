@@ -100,7 +100,7 @@ class GaiaLoaderFactory():
         torch.save(train_loader, 'gaia_train.pt')
         torch.save(cv_loader, 'gaia_cv.pt')
 
-    def generate2d(self, batch_size=25, num_samples=6000, train_size=0.9):
+    def generate2d(self, batch_size=10, num_samples=6000, train_size=0.9):
         # df = pd.read_csv(os.path.join(self.path, self.file))
         # sources = list(df['source_id'].unique())
         # sources = random.sample(sources, num_samples)

@@ -80,6 +80,7 @@ complexity of the dynamics.
 - scaling: x/x_max_band where we use respective max for each band. Lose relative strength but keep trends - can see when not correlated.
 - scaling: log magnitude - easier to train - centred around zero but is not magnitude/distance invariant - closer objects less comparable to same objects at distance.
 - interval: some intervals measured lots of objects but only had a few points, while others looked at fewer objects for longer times. I opted to filter by better measurements. Variable length!
+- Added sigmoid activation at end of decoder to constrain 0-1 as we are looking at normalized max flux
 
 # Astronomy
 - Explain flux over error and MJD
@@ -138,3 +139,16 @@ complexity of the dynamics.
 # Misc
 - https://twitter.com/tsboyajian/status/1181981342440906753
 - Say something about 1420 MHz
+
+
+<!-- decoder = nn.Sequential(
+		   nn.Linear(latent_dim, latent_dim//2), 
+		   nn.Tanh(),
+		   nn.Linear(latent_dim//2, input_dim)) -->
+
+<!-- self.decoder = nn.Sequential(
+			nn.Linear(latent_dim, n_units),
+			nn.Tanh(),
+			nn.Linear(n_units, n_units),
+			nn.Tanh(),
+			nn.Linear(n_units, input_dim), nn.Sigmoid()) -->

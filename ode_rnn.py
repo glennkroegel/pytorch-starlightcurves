@@ -64,7 +64,7 @@ def create_ODERNN_model():
         odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
 
     model = ODE_RNN(input_dim=input_dim, latent_dim=latent_dim, 
-                n_gru_units = 100, n_units = 100, device = device, 
+                n_gru_units = 50, n_units = 50, device = device, 
                 z0_diffeq_solver = z0_diffeq_solver,
                 concat_mask = True, obsrv_std = obsrv_std,
                 use_binary_classif = False,
@@ -73,7 +73,7 @@ def create_ODERNN_model():
                 train_classif_w_reconstr = False
                 ).to(device)
 
-    disable_bias = True
+    disable_bias = False
     if disable_bias:
         for module in model.modules():
             if hasattr(module, 'bias'):
@@ -101,7 +101,7 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-4)
     train_loader = torch.load('gaia2d_train.pt')
     cv_loader = torch.load('gaia2d_cv.pt')
     num_batches = len(train_loader)
