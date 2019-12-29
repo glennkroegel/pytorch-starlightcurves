@@ -153,3 +153,8 @@ complexity of the dynamics.
 			nn.Linear(n_units, n_units),
 			nn.Tanh(),
 			nn.Linear(n_units, input_dim), nn.Sigmoid()) -->
+<!-- 
+self.decoder = nn.Sequential(
+        nn.Linear(latent_dim, n_units),
+        nn.Tanh(),
+        nn.Linear(n_units, input_dim),) -->

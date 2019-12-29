@@ -46,7 +46,7 @@ latent_dim = 40
 
 def create_ODERNN_model():
 
-    obsrv_std = torch.Tensor([0.2]).to(device)
+    obsrv_std = torch.Tensor([0.1]).to(device)
     z0_prior = Normal(torch.Tensor([0.0]).to(device), torch.Tensor([1.]).to(device))
     gru_units = 40
     n_ode_gru_dims = latent_dim
@@ -61,7 +61,7 @@ def create_ODERNN_model():
         device = device).to(device)
 
     z0_diffeq_solver = DiffeqSolver(input_dim, rec_ode_func, "dopri5", latent_dim, 
-        odeint_rtol = 1e-5, odeint_atol = 1e-7, device = device)
+        odeint_rtol = 1e-3, odeint_atol = 1e-4, device = device)
 
     model = ODE_RNN(input_dim=input_dim, latent_dim=latent_dim, 
                 n_gru_units = 50, n_units = 50, device = device, 
@@ -101,7 +101,7 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-3)
     train_loader = torch.load('tess_train.pt')
     cv_loader = torch.load('tess_cv.pt')
     num_batches = len(train_loader)
