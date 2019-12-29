@@ -125,6 +125,7 @@ complexity of the dynamics.
 - Switching L1 loss for L2 I found is better at capturing small local oscillations probably since larger.
 - Disabled bias
 - Clustering, one-vs-all similarity search for most unique objects
+- Clustering: OPTICS algorithm also assigns objects to no cluster if necessary. 
 - If you have clusters you can then map them accross the sky or produce a power spectrum. Potentially provide insight and validation of cosmological models.
 
 # Datasets
@@ -140,6 +141,8 @@ complexity of the dynamics.
 # Misc
 - https://twitter.com/tsboyajian/status/1181981342440906753
 - Say something about 1420 MHz
+- Say something about shallow model but still effective - speed / sophistication trade off. 20k vecs in 16s
+- Training on simulated data to then do an encoding search
 
 
 <!-- decoder = nn.Sequential(
