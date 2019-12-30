@@ -138,6 +138,12 @@ def batchify(data_dict):
     batch_dict["labels"] = data_dict["labels"]
     return batch_dict
 
+def znorm(x):
+    u = x.mean()
+    std = x.std()
+    z = (x-u)/std
+    return z
+
 def process_gaia_csv(infile, min_count=15):
     df = pd.read_csv(infile)
     df = df.loc[df['band'] != 'G']
@@ -151,7 +157,8 @@ def process_gaia_csv(infile, min_count=15):
     df = df.loc[df['interval'] == interval]
     # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: x/x.max())
     # df['scaled'] = df.groupby(['source_id'])['flux_over_error'].transform(lambda x: x/x.max())
-    df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: np.log10(1+x)-1.5)
+    # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: np.log10(1+x)-1.5)
+    df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: znorm(x))
     counts = df.groupby('source_id')['scaled'].count()
     keep = counts[counts > min_count]
     df = df.loc[df['source_id'].isin(keep.index)]
