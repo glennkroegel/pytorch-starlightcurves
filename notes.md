@@ -127,6 +127,9 @@ complexity of the dynamics.
 - Clustering, one-vs-all similarity search for most unique objects
 - Clustering: OPTICS algorithm also assigns objects to no cluster if necessary. 
 - If you have clusters you can then map them accross the sky or produce a power spectrum. Potentially provide insight and validation of cosmological models.
+- tsne: https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding
+- tsne: As Van der Maaten and Hinton explained: "The similarity of datapoint x j {\displaystyle x_{j}} x_{j} to datapoint x i {\displaystyle x_{i}} x_{i} is the conditional probability, p j | i {\displaystyle p_{j|i}} {\displaystyle p_{j|i}}, that x i {\displaystyle x_{i}} x_{i} would pick x j {\displaystyle x_{j}} x_{j} as its neighbor if neighbors were picked in proportion to their probability density under a Gaussian centered at x i {\displaystyle x_{i}} x_{i}.
+- tsne: tsne has difficulty dealing with high dimensions as the ability to distinguish points by distance diminishes with increasing dimensions. 30-50 max.
 
 # Datasets
 - https://www.quora.com/What-are-some-astronomy-datasets-open-to-the-public
