@@ -144,13 +144,13 @@ def znorm(x):
     z = (x-u)/std
     return z
 
-def process_gaia_csv(infile, min_count=15):
+def process_gaia_csv(infile, min_count=10):
     df = pd.read_csv(infile)
     df = df.loc[df['band'] != 'G']
     df = df.loc[~(df['rejected_by_photometry'] | df['rejected_by_variability'])]
     df['time'] = df['time'].astype(np.float32)
     df['time_resampled'] = df['time'].apply(lambda x: np.round(x, 2))
-    df['interval'] = pd.cut(df['time_resampled'], 200, precision=2)
+    df['interval'] = pd.cut(df['time_resampled'], 250, precision=2)
     # interval = df.groupby('interval')['source_id'].apply(
     #     lambda x: len(x.unique())).sort_values(ascending=False).head(1).index[0]
     interval = df.groupby('interval')['source_id'].count().sort_values(ascending=False).head(1).index[0]

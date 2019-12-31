@@ -117,7 +117,7 @@ class GaiaLoaderFactory():
         # counts = df.groupby('source_id')['scaled'].count()
         # keep = counts[counts > 10]
         # df = df.loc[df['source_id'].isin(keep.index)]
-        df = process_gaia_csv(os.path.join(self.path, self.file), min_count=20)
+        df = process_gaia_csv(os.path.join(self.path, self.file), min_count=10)
         sources = list(df['source_id'].unique())
         print(len(sources))
         # df['scaled'] = df.groupby(['source_id', 'band'])['flux_over_error'].transform(lambda x: np.log10(1+x)-1.5)

@@ -140,6 +140,7 @@ complexity of the dynamics.
 
 # Misc
 - https://twitter.com/tsboyajian/status/1181981342440906753
+- https://www.reddit.com/r/KIC8462852/comments/89206w/mast_tweeted_out_the_list_of_tess_target_stars/
 - Say something about 1420 MHz
 - Say something about shallow model but still effective - speed / sophistication trade off. 20k vecs in 16s
 - Training on simulated data to then do an encoding search
