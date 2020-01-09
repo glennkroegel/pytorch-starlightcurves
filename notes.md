@@ -22,8 +22,9 @@ https://stats.stackexchange.com/questions/309642/why-is-softmax-output-not-a-goo
 - https://github.com/sungyubkim/MCDO/blob/master/Bayesian_CNN_with_MCDO.ipynb
 - Softmax has a tendency to squeeze everything
 
-# VAE
+# VAE and Z latent state
 - The latent variable z describes local structure of each data point.
+- Since the decoder component has to be able to reconstruct the original signal (since we're doing interpolation) then the encoder will find a representation that maximizes this information. Every value in the latent state will have some meaning that is useful in reconstructing the signal, but is unfortunately not human interpretable (like traditional time series analysis features like power).
 - The observations depend on the latent variable z in a complex, non-linear way, we expect the posterior over the latents to have a complex structure.
 - Amortization is required to keep the large number of variational parameters under control.
 - For a model with large observations, running the model and guide and constructing the ELBO involves evaluating log pdfs whose complexity scales badly.
@@ -66,6 +67,12 @@ complexity of the dynamics.
 - Reconstruction/interpolation: Show an unseen sample with unevenly sampled data (with transients) and show that the reconstruction captures complexities. Mention how this non linear interpretation is then encoded in the latent state which can then be searched through and compress the signal.
 - Probably should demonstrate interpolation within sampled data
 
+# Tess
+
+-
+-
+- Show most interesting object. 
+
 # Gaia
 - One billion stars in our galaxy
 - Solar system - asteroids, trojan companions, kuiper belt objects and centaurs.
@@ -83,7 +90,10 @@ complexity of the dynamics.
 - Added sigmoid activation at end of decoder to constrain 0-1 as we are looking at normalized max flux
 
 # Astronomy
-- Explain flux over error and MJD
+- Light curves. Measure brightness over time through a photometer on the spacecraft. 
+- A star can still show variable brightness due to star spots (dark regions on the surface) as the star rotates on its axis.
+- You need to observe for several periods (years) to confirm an orbit or other phenomena - lots of data
+- Good explanation of EM spectrum - https://www.seti.org/seti-institute/project/details/seti-observations
 - A Search for Analogs of KIC8462852 A Proof of Concept and First Candidates - https://iopscience.iop.org/article/10.3847/2041-8213/ab2e77
 - https://www.skyandtelescope.com/astronomy-news/are-there-more-stars-like-boyajians-star/
 - Lots of stellar properties we can input into models (e.g. https://exoplanetarchive.ipac.caltech.edu/cgi-bin/)
@@ -93,8 +103,25 @@ complexity of the dynamics.
 - Can do joint optical and infrared as well like Keck
 - We know Tabby's star is not aliens because it absorbs specific frequencies in infrared, meaning it is not opaque.
 
+# Light curves
+- The main tool is looking for indirect evidence. 
+- Measure brightness over time through a photometer on the spacecraft.
+- Stars dim if an object gets in the way, which is proportional to the apparent size of that object relative to the star.
+- The units we use are flux
+- With low sensitivity instruments you therefore can only see objects that are massive and close to the star. This created a measurement bias in the data as all of these early planets were the size of Jupiter and in orbits similar or closer than that of Mercury. 
+- You need its orbital plane to be titled toward us. People tend to think the solar system line up with the galactic plane but they unfortunately do not. Our solar system is about 60 degrees off center (which is why you can get a better view of the galactic plane in the southern hemisphere).
+- To confirm a natural phenomena like a planet, you need to observe the star for long enough to see the dimming repeat. For example, someone observing the Sun would need to observe it for a year to see any corresponding dip created by the Earth. And really you would need to do this at least three times. 
+- You can then take that period, and combined with properties of the Star you can determine how far away it is, and infer what the surface temperature will be, for example.
+
+# Infrared broader EM
+- What is scattered and reflected + what is absorbed is equal to what is blocked.
+- Light absorbed gets emitted as heat. This heat can then be detected when looking at the object in infrared.
+- Remember that infrared is not just one frequency but a range of frequencies. The particular frequencies emitted will say something about what is absorbing the light e.g. liquid water.
+- So we can see opaque objects in infrared.
+
 # Radio Astronomy
 - Radio astronomy - nature doesn't like to produce narrow band signals, sources usually spill over into other frequencies. 
+- https://phys.org/news/2017-09-unexpected-big-data-boom-radioastronomy.html
 
 
 # Similarity search
@@ -111,19 +138,33 @@ complexity of the dynamics.
 - Gaia data is 200TB - should be possible to handle this with the above methods. We can encode lots of information into any dimension we want to save memory. More dims is more expressive but higher memory (tradeoff).
 - Multiple input and output results in the same output vector, which can be added to the db. The query vector will then be the output of the neural network that took in these multiple inputs.
 
+# Time series challenges (place after light curve and maybe before ODE RNN as it is the soln)
+- Variable length
+- Non homogenious in time
+- for missing data read related work in paper
+
 # ML
 - Stress that ML is more than just classification. In reality we don't have lots of labeled data, and it can be mislabeled as this is done by humans.
-- Can even use the method for spectroscopy. The non-linear way it gets encoded captures different combnations of elements and will cluster phenomena together.
-- Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers since we are training on reconstruction of the signal, and since RNNs capture non-linearities we can also capture this complexity.
+- Can even use the method for spectroscopy . The non-linear way it gets encoded captures different combnations of elements and will cluster phenomena together.
+- Works as a compression algorithm e.g. Gaia time series have 20k measurements and we can capture most of the information in say 100 numbers since we are training on reconstruction of the signal, and since RNNs capture non-linearities we canpnpt also capture this complexity.
 - Do prepare the AE interpolation - Bernoulli distribution with p=0.25 and do element-wise product, we keep all the values for the ground truth, forces the model to learn how to understand the dynamics on the signal. 
 - At a crossroads where RNNs are being used less in favor of CNNs with attention and positional encodings. This is what is used in state of the art NLP models in the form of the transformer architecture.
 - Unevenly spaced, show gaps in measurements - do a heatmap like at MT
-- Issue of variable length
-- for missing data read related work in paper
 - Explain and demonstrate: Interpolation, extrapolation, concept of latent state instead of just prediction (inc. compression effect), concept of similarity, concept of search, simulate inputs then getting state and searching db with this, concept of query within db to find strange objects.
 - Batching in non-homogenous time series - get the union and batch on intersection? For the sake of reducing the size of the union of time points I round to the nearest 3rd decimal. This discretization doesn't drastically reduce the number of observations. 
 - Switching L1 loss for L2 I found is better at capturing small local oscillations probably since larger.
 - Disabled bias
+
+# Clustering
+- Hierarcheal, spectral, density, graph based clustering
+- centroid based clustering not good as it assumes similar distributions and symmetry to the clusters.
+- Euclidean distance breaks in high dimensions.
+- High dimensions are bizarre places and intuitive properties in 2-3 dimensions don't necessarily apply there. 
+- Given the theme of this article is trying to automate away most of the process, we don't want to have to know how many clusters there are to define or what there distributions should be. We want to automatically determine this.
+- Graph clusteri
+- Out of all the clustering algorithms there are only a few density based approaches which allow us to not specify the number of clusters.
+- http://primo.ai/index.php?title=Density-Based_Spatial_Clustering_of_Applications_with_Noise_(DBSCAN)
+- https://github.com/scikit-learn-contrib/hdbscan
 - Clustering, one-vs-all similarity search for most unique objects
 - Clustering: OPTICS algorithm also assigns objects to no cluster if necessary. 
 - If you have clusters you can then map them accross the sky or produce a power spectrum. Potentially provide insight and validation of cosmological models.
@@ -165,3 +206,6 @@ self.decoder = nn.Sequential(
         nn.Linear(latent_dim, n_units),
         nn.Tanh(),
         nn.Linear(n_units, input_dim),) -->
+
+
+<!-- # left ( { matrix{x_{1,1} ## x_{1,2} ## x_{2,1} ## x_{2,2}} } right )   -->
