@@ -165,6 +165,7 @@ complexity of the dynamics.
 - Out of all the clustering algorithms there are only a few density based approaches which allow us to not specify the number of clusters.
 - http://primo.ai/index.php?title=Density-Based_Spatial_Clustering_of_Applications_with_Noise_(DBSCAN)
 - https://github.com/scikit-learn-contrib/hdbscan
+- HDBSCAN - Hierarchical Density-Based Spatial Clustering of Applications with Noise. Performs DBSCAN over varying epsilon values and integrates the result to find a clustering that gives the best stability over epsilon. This allows HDBSCAN to find clusters of varying densities (unlike DBSCAN), and be more robust to parameter selection.
 - Clustering, one-vs-all similarity search for most unique objects
 - Clustering: OPTICS algorithm also assigns objects to no cluster if necessary. 
 - If you have clusters you can then map them accross the sky or produce a power spectrum. Potentially provide insight and validation of cosmological models.
