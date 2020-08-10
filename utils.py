@@ -18,6 +18,14 @@ def one_hot(labels, num_classes):
     y = y[labels]
     return y
 
+def simple_collate(data, device=device):
+    batch = torch.stack(data)
+    bs = batch.size(0)
+    sl = batch.size(1)
+    y1 = batch[:,2]
+    y2 = batch[:,3]
+    return y1, y2
+
 def collate_ts(data, device=device):
     batch = torch.stack(data)
     bs = batch.size(0)
@@ -83,6 +91,28 @@ def collate_interp_sparse(data, device=device):
                     'mode': 'interp', 
                     'labels': None}
     # batch_dict = batchify(batch_dict)
+    return batch_dict
+
+def collate_interp_sparse_sectors(data, device=device):
+    '''No subsampling of obs measurement'''
+    if isinstance(data, list):
+        batch = data[0]
+    elif isinstance(data, torch.Tensor):
+        batch = data
+    bs = batch.size(0)
+    sl = batch.size(2)
+    ts = batch[:, 0]
+    y = batch[:, 1].unsqueeze(-1)
+    mask = (y != 0).float()
+    batch_dict = {'observed_data': y.to(device), 
+                    'observed_tp': ts[0].view(-1).to(device), 
+                    'data_to_predict': y.to(device), 
+                    'tp_to_predict': ts[0].view(-1).to(device), 
+                    'observed_mask': mask.to(device), 
+                    'mask_predicted_data': mask.to(device), 
+                    'labels': None, 
+                    'mode': 'interp', 
+                    'labels': None}
     return batch_dict
 
 def collate_2d(data, device=device):

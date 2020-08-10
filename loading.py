@@ -10,7 +10,7 @@ import numpy as np
 import glob
 import random
 from config import TRAIN_DATA, CV_DATA
-from utils import pooling, batchify, collate_interp_sparse, collate_2d, process_gaia_csv, collate_extrap
+from utils import pooling, batchify, collate_interp_sparse, collate_2d, process_gaia_csv, collate_extrap, collate_interp_sparse_sectors
 
 import torch
 import torch.nn.functional as F
@@ -199,6 +199,18 @@ class TessDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.files)
 
+class TessDatasetSectors(torch.utils.data.Dataset):
+    def __init__(self, batches):
+        self.batches = batches
+
+    def __getitem__(self, i):
+        data = [np.load(x).astype(np.float32) for x in self.batches[i]]
+        data = torch.FloatTensor(data)
+        return data
+
+    def __len__(self):
+        return len(self.batches)
+
 class TessLoaderFactory():
     '''Load Tess time series data in batches for DL models'''
     def __init__(self, path='tess/16_processed/z_normalized'):
@@ -216,6 +228,45 @@ class TessLoaderFactory():
         cv_loader = DataLoader(cv_ds, batch_size=batch_size, collate_fn=collate_interp_sparse)
         torch.save(train_loader, 'tess_train.pt')
         torch.save(cv_loader, 'tess_cv.pt')
+
+    def generate_from_sectors(self, batch_size=100, train_size=0.8):
+        indir = 'tess/all_data/z_normalized/'
+        sectors = os.listdir(indir)
+        res = {}
+        for i in sectors:
+            sector = str(i)
+            c = os.path.join(indir, sector, '*.npy')
+            files = glob.glob(c)
+            for f in files:
+                d = np.load(f)
+                t1 = d[0].min()
+                t2 = d[0].max()
+                l = len(d[0])
+                basename = os.path.basename(f)
+                summary = {'path': f, 't1': t1, 't2': t2, 'l': l, 'sector': sector}
+                res[basename] = summary
+        
+        df = pd.DataFrame(res).T
+        groups=df.groupby(['sector','l'])['path'].apply(lambda x: list(x)).tolist()
+        print(groups)
+        print("Total groups: {0}", len(groups))
+        bs = batch_size
+        batches = []
+        for group in groups:
+            mini_batches=[group[i:(i+bs)] for i in range(0, len(group), bs)]
+            for b in mini_batches:
+                batches.append(b)
+        random.shuffle(batches)
+        L = int(train_size*len(batches))
+        train_batches = batches[:L]
+        cv_batches = batches[L:]
+
+        train_ds = TessDatasetSectors(train_batches)
+        cv_ds = TessDatasetSectors(cv_batches)
+        train_loader = DataLoader(train_ds, batch_size=1, collate_fn=collate_interp_sparse_sectors)
+        cv_loader = DataLoader(cv_ds, batch_size=1, collate_fn=collate_interp_sparse_sectors)
+        torch.save(train_loader, 'tess-sectors_train.pt')
+        torch.save(cv_loader, 'tess-sectors_cv.pt')
 
     def generate_extrap(self, batch_size=50, num_samples=1000, train_size=0.9):
         files = random.sample(self.files, num_samples)
@@ -422,5 +473,5 @@ class VAEDataLoaderFactory():
 
 if __name__ == "__main__":
     f = TessLoaderFactory()
-    f.generate()
+    f.generate_from_sectors(batch_size=100)
 
