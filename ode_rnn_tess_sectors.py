@@ -31,9 +31,13 @@ from utils import count_parameters, accuracy, bce_acc, accuracy_from_logits, one
 from config import NUM_EPOCHS
 from loading import TessDatasetSectors
 import shutil
+import logging
 
 import warnings
 warnings.filterwarnings("ignore")
+
+logging.basicConfig(level=logging.DEBUG, filename="logfile", filemode="a+",
+                        format="%(asctime)-15s %(levelname)-8s %(message)s")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -100,13 +104,14 @@ def status(epoch, train_props, cv_props=None):
         for k,v in cv_props.items():
             s2 = s2 + 'cv_'+ k + ': ' + str(v) + ' '
         print(s0 + s1 + s2)
+        logging.info(s0 + s1 + s2)
     else:
         print(s0 + s1)
 
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-1, weight_decay=1e-5)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=5e-3, weight_decay=1e-5)
     train_loader = torch.load('tess-sectors_train.pt')
     cv_loader = torch.load('tess-sectors_cv.pt')
     num_batches = len(train_loader)
