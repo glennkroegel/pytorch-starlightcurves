@@ -40,6 +40,7 @@ logging.basicConfig(level=logging.DEBUG, filename="logfile", filemode="a+",
                         format="%(asctime)-15s %(levelname)-8s %(message)s")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device('cpu')
 
 ##################################################################
 # Options
@@ -48,7 +49,7 @@ classif_per_tp = False
 n_labels = 1
 niters = 1
 status_properties = ['loss', 'ratio']
-latent_dim = 50
+latent_dim = 40
 
 ##################################################################
 # Model
@@ -111,7 +112,7 @@ def status(epoch, train_props, cv_props=None):
 if __name__ == '__main__':
     
     print(model)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=5e-3, weight_decay=1e-5)
+    optimizer = torch.optim.Adamax(model.parameters(), lr=1e-2, weight_decay=1e-6)
     train_loader = torch.load('tess-sectors_train.pt')
     cv_loader = torch.load('tess-sectors_cv.pt')
     num_batches = len(train_loader)
@@ -126,11 +127,10 @@ if __name__ == '__main__':
         train_loss = 0
         train_props = {k:0 for k in status_properties}
         for i, data in enumerate(train_loader):
-            if i == 25: break
             if i % 20 == 0:
                 print(i)
             optimizer.zero_grad()
-            train_res = model.compute_all_losses(data, n_traj_samples=50)
+            train_res = model.compute_all_losses(data, n_traj_samples=10)
             train_res['loss'].backward()
             train_props['loss'] += train_res['loss'].item()
             train_props['ratio'] += (train_res["kl_first_p"] / train_res["mse"]).item()
@@ -140,8 +140,7 @@ if __name__ == '__main__':
         cv_props = {k:0 for k in status_properties}
         with torch.no_grad():
             for i, data in enumerate(cv_loader):
-                if i == 25: break
-                cv_res = model.compute_all_losses(data, n_traj_samples=50)
+                cv_res = model.compute_all_losses(data, n_traj_samples=10)
                 cv_props['loss'] += cv_res['loss'].detach().item()
                 cv_props['ratio'] += (cv_res["kl_first_p"] / cv_res["mse"]).item()
             cv_props = {k:v/len(cv_loader) for k,v in cv_props.items()}
@@ -150,9 +149,9 @@ if __name__ == '__main__':
         if cv_loss < best_loss:
             best_loss = cv_loss
             print('Saving state...')
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_tess_sectors.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, '3ode_rnn_state_tess_sectors.pth.tar')
         if epoch > 50:
-            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, 'ode_rnn_state_tess_sectors50.pth.tar')
+            torch.save({'epoch': epoch, 'loss': loss, 'state_dict': model.state_dict()}, '3ode_rnn_state_tess_sectors50.pth.tar')
 
 
         

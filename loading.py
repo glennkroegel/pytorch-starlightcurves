@@ -229,9 +229,10 @@ class TessLoaderFactory():
         torch.save(train_loader, 'tess_train.pt')
         torch.save(cv_loader, 'tess_cv.pt')
 
-    def generate_from_sectors(self, batch_size=100, train_size=0.8):
+    def generate_from_sectors(self, batch_size=100, train_size=0.7):
         indir = 'tess/all_data/z_normalized/'
         sectors = os.listdir(indir)
+        # sectors = sectors
         res = {}
         for i in sectors:
             sector = str(i)
@@ -473,5 +474,5 @@ class VAEDataLoaderFactory():
 
 if __name__ == "__main__":
     f = TessLoaderFactory()
-    f.generate_from_sectors(batch_size=100)
+    f.generate_from_sectors(batch_size=20)
 
